@@ -1,0 +1,11 @@
+__pycache__
+.vscode
+.editorconfig
+config.ini
+
+tmp
+
+cogs/_guild.json
+cogs/_user.json
+cogs/_error.txt
+cogs/topgg.py
