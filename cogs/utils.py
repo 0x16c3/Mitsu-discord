@@ -156,6 +156,7 @@ if not os.path.isfile("tmp/config.ini"):
     fp.write("; interval for recieving list updates\n")
     fp.write("INTERVAL = 60\n")
     fp.write("; maximum list items that a RssFeed object can contain\n")
+    fp.write("MEMORY_LIMIT = 25\n")
     fp.close()
 
 cfgparser.read("tmp/config.ini", encoding="utf-8-sig")
