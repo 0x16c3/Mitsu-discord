@@ -90,7 +90,7 @@ class Feed:
                 try:
                     await func(item=item, **kwargs)
                 except Exception as e:
-                    print(e)
+                    logger.print("Error moving entry {}: {}".format(item.id, e))
 
             if self.type == CListActivity:
 

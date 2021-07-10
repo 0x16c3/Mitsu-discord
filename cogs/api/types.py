@@ -127,8 +127,10 @@ class CUser(User):
         if channel:
             try:
                 await channel.send(embed=embed)
-            except:
-                logger.info(f"Cannot send message -> {str(channel.id)} : {self.name}")
+            except Exception as e:
+                logger.info(
+                    f"Cannot send message -> {str(channel.id)} : {self.name} {e}"
+                )
         else:
             return embed
 
@@ -175,15 +177,23 @@ class CListActivity(ListActivity):
         is_manga = isinstance(item.media, Manga)
 
         status = ""
-        progress = "{} {}. {}".format(
-            str(item.status.progress)
-            if isinstance(item.status.progress, int)
-            else " - ".join(str(i) for i in item.status.progress),
-            "chapters" if is_manga else "episodes",
-            "\n Score ⭐: {}".format(listitem.score)
-            if listitem.score > 0 and item.status == "COMPLETED"
-            else "",
-        )
+        if item.status and item.status.progress:
+            progress = "{} {}. {}".format(
+                str(item.status.progress)
+                if isinstance(item.status.progress, int)
+                else " - ".join(str(i) for i in item.status.progress),
+                "chapters" if is_manga else "episodes",
+                "\n Score ⭐: {}".format(listitem.score)
+                if listitem.score > 0 and item.status == "COMPLETED"
+                else "",
+            )
+        else:
+            progress = "Total {} episodes. {}".format(
+                str(item.media.episodes) if item.media.episodes else "???",
+                "\n Score ⭐: {}".format(listitem.score)
+                if listitem.score > 0 and item.status == "COMPLETED"
+                else "",
+            )
 
         if listitem.status == "CURRENT":
             if listitem.progress == 0:
@@ -199,18 +209,23 @@ class CListActivity(ListActivity):
         elif listitem.status == "COMPLETED":
             if listitem.repeat > 0:
                 status = f"Finished Re{'reading' if is_manga else 'watching'}"
-
+            else:
+                status = str(item.status)
             color = color_main
 
         elif listitem.status == "PAUSED":
+            status = str(item.status)
             color = color_warn
 
         elif listitem.status == "DROPPED":
+            status = str(item.status)
             color = color_errr
 
         elif listitem.status == "PLANNING":
             if listitem.repeat > 0:
-                status.status = f"Planning to {'Read' if is_manga else 'Watch'} Again"
+                status = f"Planning to {'Read' if is_manga else 'Watch'} Again"
+            else:
+                status = str(item.status)
 
             if is_manga:
                 if item.media.chapters:
@@ -220,6 +235,9 @@ class CListActivity(ListActivity):
             else:
                 progress = f"Total episodes: {str(item.media.episodes) if item.media.episodes else 'Not Available'}"
             color = color_main
+
+        else:
+            status = str(item.status)
 
         embed = discord.Embed(
             title=item.media.title.romaji,
@@ -260,9 +278,9 @@ class CListActivity(ListActivity):
         if channel:
             try:
                 await channel.send(embed=embed)
-            except:
+            except Exception as e:
                 logger.info(
-                    f"Cannot send message -> {str(channel.id)} : {item.username}"
+                    f"Cannot send message -> {str(channel.id)} : {item.username} {e}"
                 )
         else:
             return embed
