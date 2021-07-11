@@ -143,6 +143,66 @@ def strip_tags(html):
     return s.get_data()
 
 
+import math
+from typing import Tuple
+
+
+def in_range(value, low, hi) -> bool:
+    if low <= value <= hi:
+        return True
+    return False
+
+
+def rgb_to_hsv(r, g, b):
+    r = float(r)
+    g = float(g)
+    b = float(b)
+    high = max(r, g, b)
+    low = min(r, g, b)
+    h, s, v = high, high, high
+
+    d = high - low
+    s = 0 if high == 0 else d / high
+
+    if high == low:
+        h = 0.0
+    else:
+        h = {
+            r: (g - b) / d + (6 if g < b else 0),
+            g: (b - r) / d + 2,
+            b: (r - g) / d + 4,
+        }[high]
+        h /= 6
+
+    return h, s, v
+
+
+def hsv_to_rgb(h, s, v):
+    i = math.floor(h * 6)
+    f = h * 6 - i
+    p = v * (1 - s)
+    q = v * (1 - f * s)
+    t = v * (1 - (1 - f) * s)
+
+    r, g, b = [
+        (v, t, p),
+        (q, v, p),
+        (p, v, t),
+        (p, q, v),
+        (t, p, v),
+        (v, p, q),
+    ][int(i % 6)]
+
+    return round(r), round(g), round(b)
+
+
+def rotate_hue(color: Tuple[int, int, int], angle) -> Tuple[int, int, int]:
+    h, s, v = rgb_to_hsv(color[0], color[1], color[2])
+    h = math.fmod(h + angle / 360.0, 1.0)
+
+    return hsv_to_rgb(h, s, v)
+
+
 """"""
 
 """

@@ -36,6 +36,13 @@ class Feed:
                 "id": self.username,
                 "content_type": "anime",
             }
+        if self.feed == self.TYPE["MANGA"]:
+            self.type = CListActivity
+            self.function = anilist.get_activity
+            self.arguments = {
+                "id": self.username,
+                "content_type": "manga",
+            }
 
         self.entries = []
         self.entries_processed = []
@@ -58,10 +65,8 @@ class Feed:
 
     async def update(self, feed: list, feed_full: list) -> None:
 
-        self.entries_full = feed_full
-
         if not self._init:
-            for item in feed_full:
+            for item in feed:
                 self.entries_processed.append(item)
 
             self._init = True
@@ -76,9 +81,11 @@ class Feed:
         for item in feed:
             if item.id in (i.id for i in self.entries_processed):
                 continue
+            if item.media.id in (i.media.id for i in self.entries):
+                continue
 
+            self.entries.insert(0, item)
             logger.info("Added " + str(item.id))
-            self.entries.append(item)
 
     async def move_item(self, item, func=None, **kwargs) -> bool:
 
@@ -90,37 +97,12 @@ class Feed:
                 try:
                     await func(item=item, **kwargs)
                 except Exception as e:
-                    logger.print("Error moving entry {}: {}".format(item.id, e))
+                    logger.print(
+                        "Error running function on entry {}: {}".format(item.id, e)
+                    )
 
             if self.type == CListActivity:
-
-                # replace in list if it exists
-                if any(
-                    (
-                        x
-                        for x in self.entries_processed
-                        if item.media.title.native == x.media.title.native
-                    )
-                ):
-                    obj = next(
-                        (
-                            x
-                            for x in self.entries_processed
-                            if item.media.title.native == x.media.title.native
-                        ),
-                        None,
-                    )
-                    idx = self.entries_processed.index(obj)
-
-                    self.entries_processed[idx] = item
-
-                else:
-                    # append if doesn't exist
-                    self.entries_processed.append(item)
-            else:
-                # not complete
                 self.entries_processed.insert(0, item)
-                self.entries_processed = self.entries_processed
 
             self.entries.remove(item)
 
@@ -148,6 +130,14 @@ class Feed:
             self.entries_processed = []
             self.entries = []
             self._init = False
+
+            items, items_full = await self.retrieve()
+            if len(items) == 0:
+                logger.info("Could not reset " + str(self) + " - FALLBACK (NEXT TICK)")
+                return []
+
+            await self.update(items, items_full)
+
             logger.info("Reset " + str(self) + " - exceeded entry limit.")
             return
 

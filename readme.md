@@ -42,3 +42,6 @@
 
 > Please read [AniList's Rate Limiting Policy](https://anilist.gitbook.io/anilist-apiv2-docs/overview/rate-limiting)
 > And configure your `INTERVAL` accordingly.
+
+> Oh and one more thing. Please update my fork of python-anilist before you run the bot.
+> I tend to push a lot of updates :S

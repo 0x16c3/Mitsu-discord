@@ -1,9 +1,15 @@
+# discord imports
 import discord
 import asyncio
 
-from typing import Optional
+# utilities
+import math
+from PIL import Image
+import urllib.request, io
+from typing import Optional, Tuple
 from ..utils import *
 
+# anilist
 from anilist import AsyncClient
 from anilist.types import (
     Anime,
@@ -19,9 +25,6 @@ from anilist.types import (
     MediaList,
     Title,
 )
-
-from PIL import Image, ImageDraw, ImageFont
-import urllib.request, io
 
 
 class CAnime(Anime):
@@ -53,6 +56,14 @@ class CUser(User):
     def create(obj: User):
         obj.__class__ = CUser
         return obj
+
+    def get_color_list(self, amount: int, rotate: int = -75):
+        colors = []
+
+        for step in range(amount):
+            colors.append(rotate_hue(self.profile_color, (step + 1) / amount * -rotate))
+
+        return colors
 
     def get_picture_color(self) -> int:
 
@@ -102,7 +113,8 @@ class CUser(User):
             else "No biography yet.",
             color=color,
         )
-        embed.set_thumbnail(url=self.image.large)
+        # embed.set_thumbnail(url=self.image.large)
+        embed.set_image(url=f"https://img.anili.st/user/{self.id}")
 
         if self.statistics.anime:
             title, content = CStatisticsUnion.create(self.statistics).embed_string(
@@ -148,6 +160,22 @@ class CListActivity(ListActivity):
 
         return obj
 
+    @staticmethod
+    def get_score_color(user: CUser, score: int) -> Tuple[int, int, int]:
+        amount = 5
+        colors = user.get_color_list(amount)
+
+        delta = 100 / amount
+
+        for i in range(amount):
+            range_min = 0 + i * delta
+            range_max = range_min + delta
+
+            if in_range(score, range_min, range_max):
+                return colors[i]
+
+        return colors[0]
+
     async def get_list(self, anilist: AsyncClient) -> Dict[User, MediaList]:
 
         if not self.username:
@@ -169,32 +197,31 @@ class CListActivity(ListActivity):
         if not user or not listitem:
             return None
 
-        user: User
+        user = CUser.create(user)
         listitem: MediaList
 
         color = discord.Color(0x000000)
 
         is_manga = isinstance(item.media, Manga)
 
-        status = ""
         if item.status and item.status.progress:
-            progress = "{} {}. {}".format(
-                str(item.status.progress)
+            progress = "{}. {}".format(
+                str(item.status)
                 if isinstance(item.status.progress, int)
                 else " - ".join(str(i) for i in item.status.progress),
-                "chapters" if is_manga else "episodes",
                 "\n Score ⭐: {}".format(listitem.score)
-                if listitem.score > 0 and item.status == "COMPLETED"
+                if listitem.score > 0 and listitem.status == "COMPLETED"
                 else "",
             )
         else:
             progress = "Total {} episodes. {}".format(
-                str(item.media.episodes) if item.media.episodes else "???",
+                str(item.media.episodes) if hasattr(item.media, "episodes") else "???",
                 "\n Score ⭐: {}".format(listitem.score)
-                if listitem.score > 0 and item.status == "COMPLETED"
+                if listitem.score > 0 and listitem.status == "COMPLETED"
                 else "",
             )
 
+        status = ""
         if listitem.status == "CURRENT":
             if listitem.progress == 0:
                 progress = f"Just started {'reading' if is_manga else 'watching'}."
@@ -211,7 +238,12 @@ class CListActivity(ListActivity):
                 status = f"Finished Re{'reading' if is_manga else 'watching'}"
             else:
                 status = str(item.status)
-            color = color_main
+
+            if listitem.score > 0:
+                r, g, b = CListActivity.get_score_color(user, listitem.score)
+                color = discord.Color.from_rgb(r, g, b)
+            else:
+                color = color_main
 
         elif listitem.status == "PAUSED":
             status = str(item.status)
@@ -219,7 +251,12 @@ class CListActivity(ListActivity):
 
         elif listitem.status == "DROPPED":
             status = str(item.status)
-            color = color_errr
+
+            if listitem.score > 0:
+                r, g, b = CListActivity.get_score_color(user, listitem.score)
+                color = discord.Color.from_rgb(r, g, b)
+            else:
+                color = color_errr
 
         elif listitem.status == "PLANNING":
             if listitem.repeat > 0:
@@ -233,7 +270,7 @@ class CListActivity(ListActivity):
                 else:
                     progress = "Total chapters: Not Available"
             else:
-                progress = f"Total episodes: {str(item.media.episodes) if item.media.episodes else 'Not Available'}"
+                progress = f"Total episodes: {str(item.media.episodes) if hasattr(item.media, 'episodes') else 'Not Available'}"
             color = color_main
 
         else:
@@ -242,10 +279,11 @@ class CListActivity(ListActivity):
         embed = discord.Embed(
             title=item.media.title.romaji,
             url=item.media.url,
-            description=item.media.title.english,
+            description=item.media.title.english
+            if hasattr(item.media.title, "english")
+            else item.media.title.native,
             color=color,
         )
-        embed.set_thumbnail(url=item.media.cover.large)
         embed.add_field(
             name=status,
             value=progress,
@@ -253,22 +291,32 @@ class CListActivity(ListActivity):
         )
 
         if listitem.status == "COMPLETED" or listitem.status == "PLANNING":
-            ranking = item.media.rankings[0]
+            ranking = None
+            if hasattr(item.media, "rankings"):
+                ranking = item.media.rankings[0]
             embed.add_field(
                 name="Stats 🧮",
                 value=(
                     f"{'Manga' if is_manga else 'Anime'}\n"
                     + (
-                        f"Premiered in {item.media.start_date}\n"
+                        f"Premiered {item.media.season.name.title()} {item.media.season.year}\n"
                         if item.media.start_date
                         else "Not Premiered Yet\n"
                     )
-                    + f"> Score ⭐: `{string(item.media.score.average)}`\n"
-                    + f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})` \n> Popularity 📈: `#{string(item.media.popularity)}`\n"
-                    + f"Description 📔: \n> {string(item.media.description)[:512] + ('...' if len(string(item.media.description)) > 512 else '')}"
+                    + f"> Score ⭐: `{string(item.media.score.mean)}`\n"
+                    + (
+                        f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
+                        if ranking
+                        else ""
+                    )
+                    + f"> Popularity 📈: `#{string(item.media.popularity)}`\n"
+                    + f"Description 📔: \n> {string(strip_tags(item.media.description[:128])) + ('...' if len(string(strip_tags(item.media.description))) > 128 else '')}"
                 ),
                 inline=False,
             )
+            embed.set_image(url=f"https://img.anili.st/media/{item.media.id}")
+        else:
+            embed.set_thumbnail(url=item.media.cover.large)
 
         embed.set_footer(
             text=f"{'Manga' if is_manga else 'Anime'} list of {item.username}",
@@ -307,10 +355,14 @@ class CStatisticsUnion(StatisticsUnion):
 
         if content_type == "anime":
             title.append(f"**Anime Statistics**")
-            title.append(f"> `Total Entries: {self.anime.count}`")
-            title.append(f"> `Total Episodes: {self.anime.episodes_watched}`")
             title.append(
-                f"> `Hours Watched: {round(self.anime.minutes_watched / 60, 1)}`"
+                f"> `Total Entries: {self.anime.count if hasattr(self.anime, 'count') else '-'}`"
+            )
+            title.append(
+                f"> `Total Episodes: {self.anime.episodes_watched if hasattr(self.anime, 'episodes_watched') else '-'}`"
+            )
+            title.append(
+                f"> `Hours Watched: {round(self.anime.minutes_watched / 60, 1) if hasattr(self.anime, 'minutes_watched') else '-'}`"
             )
 
             if hasattr(self.anime, "statuses"):
@@ -348,9 +400,15 @@ class CStatisticsUnion(StatisticsUnion):
 
         elif content_type == "manga":
             title.append(f"**Manga Statistics**")
-            title.append(f"> `Total Entries: {self.manga.count}`")
-            title.append(f"> `Total Volumes: {self.manga.volumes_read}`")
-            title.append(f"> `Total Chapters: {self.manga.chapters_read}`")
+            title.append(
+                f"> `Total Entries: {self.manga.count if hasattr(self.manga, 'count') else '-'}`"
+            )
+            title.append(
+                f"> `Total Volumes: {self.manga.volumes_read if hasattr(self.manga, 'volumes_read') else '-'}`"
+            )
+            title.append(
+                f"> `Total Chapters: {self.manga.chapters_read if hasattr(self.manga, 'chapters_read') else '-'}`"
+            )
 
             if hasattr(self.manga, "statuses"):
                 len_status = []
