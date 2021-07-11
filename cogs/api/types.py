@@ -24,6 +24,7 @@ from anilist.types import (
     Statistic,
     MediaList,
     Title,
+    score,
 )
 
 
@@ -303,7 +304,11 @@ class CListActivity(ListActivity):
                         if item.media.start_date
                         else "Not Premiered Yet\n"
                     )
-                    + f"> Score ⭐: `{string(item.media.score.mean)}`\n"
+                    + (
+                        f"> Score ⭐: `{string(item.media.score.mean)}`\n"
+                        if hasattr(item.media.score, "mean")
+                        else ""
+                    )
                     + (
                         f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
                         if ranking
