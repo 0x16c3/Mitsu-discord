@@ -309,7 +309,11 @@ class CListActivity(ListActivity):
                         if ranking
                         else ""
                     )
-                    + f"> Popularity 📈: `#{string(item.media.popularity)}`\n"
+                    + (
+                        f"> Popularity 📈: `#{string(item.media.popularity)}`\n"
+                        if hasattr(item.media, "popularity")
+                        else ""
+                    )
                     + f"Description 📔: \n> {string(strip_tags(item.media.description[:128])) + ('...' if len(string(strip_tags(item.media.description))) > 128 else '')}"
                 ),
                 inline=False,
