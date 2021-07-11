@@ -6,7 +6,8 @@ import asyncio
 import math
 from PIL import Image
 import urllib.request, io
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
+from datetime import date
 from ..utils import *
 
 # anilist
@@ -24,12 +25,11 @@ from anilist.types import (
     Statistic,
     MediaList,
     Title,
-    score,
 )
 
 
 class CAnime(Anime):
-    def create(obj: Anime):
+    def create(obj: Anime) -> "CAnime":
         obj.__class__ = CAnime
         return obj
 
@@ -37,11 +37,68 @@ class CAnime(Anime):
         self,
         channel: discord.TextChannel = None,
     ) -> Optional[discord.Embed]:
-        pass
+        embed = discord.Embed(
+            title=self.title.romaji,
+            url=self.url,
+            description=self.title.english
+            if hasattr(self.title, "english")
+            else self.title.native,
+            color=color_main,
+        )
+
+        ranking = None
+        if hasattr(self, "rankings"):
+            ranking = self.rankings[0]
+        embed.add_field(
+            name="Stats 🧮",
+            value=(
+                (
+                    (
+                        f"Aired <t:{self.start_date.get_timestamp()}:D> to <t:{self.end_date.get_timestamp()}:D>\n"
+                        if hasattr(self, "end_date")
+                        and self.end_date.get_timestamp() != -1
+                        else f"Airing since <t:{self.start_date.get_timestamp()}:R>\n"
+                    )
+                    if hasattr(self, "start_date")
+                    else ""
+                )
+                + (
+                    f"Premiered {self.season.name.title()} {self.season.year}\n"
+                    if hasattr(self, "season")
+                    else "Not Premiered Yet\n"
+                )
+                + (
+                    f"> Score ⭐: `{string(self.score.mean)}`\n"
+                    if hasattr(self.score, "mean")
+                    else ""
+                )
+                + (
+                    f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
+                    if ranking
+                    else ""
+                )
+                + (
+                    f"> Popularity 📈: `#{string(self.popularity)}`\n"
+                    if hasattr(self, "popularity")
+                    else ""
+                )
+                + f"Description 📔: \n> {string(strip_tags(self.description[:128])) + ('...' if len(string(strip_tags(self.description))) > 128 else '')}"
+            ),
+            inline=False,
+        )
+        embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+
+        if channel:
+            try:
+                await channel.send(embed=embed)
+            except Exception as e:
+                logger.info(f"Cannot send message -> {str(channel.id)} : {self.id} {e}")
+        else:
+            return embed
 
 
 class CManga(Manga):
-    def create(obj: Manga):
+    def create(obj: Manga) -> "CManga":
         obj.__class__ = CManga
         return obj
 
@@ -49,12 +106,64 @@ class CManga(Manga):
         self,
         channel: discord.TextChannel = None,
     ) -> Optional[discord.Embed]:
-        pass
+        embed = discord.Embed(
+            title=self.title.romaji,
+            url=self.url,
+            description=self.title.english
+            if hasattr(self.title, "english")
+            else self.title.native,
+            color=color_main,
+        )
+
+        ranking = None
+        if hasattr(self, "rankings"):
+            ranking = self.rankings[0]
+        embed.add_field(
+            name="Stats 🧮",
+            value=(
+                (
+                    (
+                        f"Released <t:{self.start_date.get_timestamp()}:D> to <t:{self.end_date.get_timestamp()}:D>\n"
+                        if hasattr(self, "end_date")
+                        and self.end_date.get_timestamp() != -1
+                        else f"Releasing since <t:{self.start_date.get_timestamp()}:R>\n"
+                    )
+                    if hasattr(self, "start_date")
+                    else ""
+                )
+                + (
+                    f"> Score ⭐: `{string(self.score.mean)}`\n"
+                    if hasattr(self.score, "mean")
+                    else ""
+                )
+                + (
+                    f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
+                    if ranking
+                    else ""
+                )
+                + (
+                    f"> Popularity 📈: `#{string(self.popularity)}`\n"
+                    if hasattr(self, "popularity")
+                    else ""
+                )
+                + f"Description 📔: \n> {string(strip_tags(self.description[:128])) + ('...' if len(string(strip_tags(self.description))) > 128 else '')}"
+            ),
+            inline=False,
+        )
+        embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+
+        if channel:
+            try:
+                await channel.send(embed=embed)
+            except Exception as e:
+                logger.info(f"Cannot send message -> {str(channel.id)} : {self.id} {e}")
+        else:
+            return embed
 
 
 class CUser(User):
     @staticmethod
-    def create(obj: User):
+    def create(obj: User) -> "CUser":
         obj.__class__ = CUser
         return obj
 
@@ -153,7 +262,7 @@ class CListActivity(ListActivity):
     username = None
 
     @staticmethod
-    def create(obj: ListActivity, username: str = None):
+    def create(obj: ListActivity, username: str = None) -> "CListActivity":
         obj.__class__ = CListActivity
 
         if username:
@@ -207,9 +316,7 @@ class CListActivity(ListActivity):
 
         if item.status and item.status.progress:
             progress = "{}. {}".format(
-                str(item.status)
-                if isinstance(item.status.progress, int)
-                else " - ".join(str(i) for i in item.status.progress),
+                item.status,
                 "\n Score ⭐: {}".format(listitem.score)
                 if listitem.score > 0 and listitem.status == "COMPLETED"
                 else "",
@@ -292,35 +399,17 @@ class CListActivity(ListActivity):
         )
 
         if listitem.status == "COMPLETED" or listitem.status == "PLANNING":
-            ranking = None
-            if hasattr(item.media, "rankings"):
-                ranking = item.media.rankings[0]
+            if is_manga:
+                cobj = CManga.create(item.media)
+            else:
+                cobj = CAnime.create(item.media)
+
+            cobj: Union[CManga, CAnime]
+            stat_embed = await cobj.send_embed()
+
             embed.add_field(
-                name="Stats 🧮",
-                value=(
-                    f"{'Manga' if is_manga else 'Anime'}\n"
-                    + (
-                        f"Premiered {item.media.season.name.title()} {item.media.season.year}\n"
-                        if item.media.start_date
-                        else "Not Premiered Yet\n"
-                    )
-                    + (
-                        f"> Score ⭐: `{string(item.media.score.mean)}`\n"
-                        if hasattr(item.media.score, "mean")
-                        else ""
-                    )
-                    + (
-                        f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
-                        if ranking
-                        else ""
-                    )
-                    + (
-                        f"> Popularity 📈: `#{string(item.media.popularity)}`\n"
-                        if hasattr(item.media, "popularity")
-                        else ""
-                    )
-                    + f"Description 📔: \n> {string(strip_tags(item.media.description[:128])) + ('...' if len(string(strip_tags(item.media.description))) > 128 else '')}"
-                ),
+                name=stat_embed.fields[0].name,
+                value=stat_embed.fields[0].value,
                 inline=False,
             )
             embed.set_image(url=f"https://img.anili.st/media/{item.media.id}")

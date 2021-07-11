@@ -13,6 +13,14 @@ from cogs.controller import (
     Feed,
     AnimeFeed,
 )
+from cogs.api.types import (
+    CAnime,
+    CManga,
+    CUser,
+    CListActivity,
+    CFavouritesUnion,
+    CStatisticsUnion,
+)
 from cogs.api.database import Database, database
 from cogs.utils import *
 
@@ -88,13 +96,19 @@ class Eval(commands.Cog):
             "ctx": ctx,
             "json": json,
             "Controller": Controller,
-            "RssFeed": Feed,
-            "MyAnimeFeed": AnimeFeed,
+            "Feed": Feed,
+            "AnimeFeed": AnimeFeed,
             "Database": Database,
             "database": database,
             "TinyDB": TinyDB,
             "where": where,
             "anilist": anilist,
+            "CAnime": CAnime,
+            "CManga": CManga,
+            "CUser": CUser,
+            "CListActivity": CListActivity,
+            "CFavouritesUnion": CFavouritesUnion,
+            "CStatisticsUnion": CStatisticsUnion,
             "color_main": color_main,
             "color_done": color_done,
             "color_warn": color_warn,

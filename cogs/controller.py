@@ -213,6 +213,16 @@ class Controller(commands.Cog):
             user: AnimeFeed = await AnimeFeed.create(item["username"], channel)
             self.feeds.append(user)
 
+        for user in self.feeds:
+            user: AnimeFeed
+
+            await user.get_feed(user.feed_anime)
+            await user.feed_anime.process_entries(
+                user.feed_anime.type.send_embed,
+                channel=user.channel,
+                anilist=anilist,
+            )
+
         logger.info(f"Loaded {len(self.feeds)}.")
 
     async def process(self):
@@ -228,9 +238,7 @@ class Controller(commands.Cog):
                     anilist=anilist,
                 )
 
-            await asyncio.sleep(
-                int(config["INTERVAL"]) if self.client.is_ready() else 1
-            )
+            await asyncio.sleep(int(config["INTERVAL"]))
 
     async def get_anime(self, query: str) -> CAnime:
         pass
