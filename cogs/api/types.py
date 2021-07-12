@@ -16,14 +16,16 @@ from anilist.types import (
     Anime,
     Manga,
     ListActivity,
+    TextActivity,
     User,
     FavouritesUnion,
     StatisticsUnion,
     Character,
     Staff,
     Studio,
-    Statistic,
     MediaList,
+    NextAiring,
+    Statistic,
     Title,
 )
 
@@ -57,7 +59,14 @@ class CAnime(Anime):
                         f"Aired <t:{self.start_date.get_timestamp()}:D> to <t:{self.end_date.get_timestamp()}:D>\n"
                         if hasattr(self, "end_date")
                         and self.end_date.get_timestamp() != -1
-                        else f"Airing since <t:{self.start_date.get_timestamp()}:R>\n"
+                        else (
+                            f"Airing since <t:{self.start_date.get_timestamp()}:R>\n"
+                            + (
+                                f"Next episode: <t:{self.next_airing.at.get_timestamp()}:R> (Episode {self.next_airing.episode})\n"
+                                if hasattr(self, "next_airing")
+                                else ""
+                            )
+                        )
                     )
                     if hasattr(self, "start_date")
                     else ""
@@ -73,7 +82,7 @@ class CAnime(Anime):
                     else ""
                 )
                 + (
-                    f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
+                    f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format} ({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
                     if ranking
                     else ""
                 )
@@ -137,7 +146,7 @@ class CManga(Manga):
                     else ""
                 )
                 + (
-                    f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format}({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
+                    f"> Rank 📈: `#{string(ranking.rank)} on {ranking.format} ({str(ranking.year) if not ranking.all_time else 'All time'})`\n"
                     if ranking
                     else ""
                 )
@@ -318,14 +327,14 @@ class CListActivity(ListActivity):
             progress = "{}. {}".format(
                 item.status,
                 "\n Score ⭐: {}".format(listitem.score)
-                if listitem.score > 0 and listitem.status == "COMPLETED"
+                if hasattr(listitem, "score") > 0 and listitem.status == "COMPLETED"
                 else "",
             )
         else:
             progress = "Total {} episodes. {}".format(
                 str(item.media.episodes) if hasattr(item.media, "episodes") else "???",
                 "\n Score ⭐: {}".format(listitem.score)
-                if listitem.score > 0 and listitem.status == "COMPLETED"
+                if hasattr(listitem, "score") > 0 and listitem.status == "COMPLETED"
                 else "",
             )
 
@@ -342,12 +351,12 @@ class CListActivity(ListActivity):
             color = color_done
 
         elif listitem.status == "COMPLETED":
-            if listitem.repeat > 0:
+            if hasattr(listitem, "repeat") > 0:
                 status = f"Finished Re{'reading' if is_manga else 'watching'}"
             else:
                 status = str(item.status)
 
-            if listitem.score > 0:
+            if hasattr(listitem, "score"):
                 r, g, b = CListActivity.get_score_color(user, listitem.score)
                 color = discord.Color.from_rgb(r, g, b)
             else:
@@ -360,20 +369,20 @@ class CListActivity(ListActivity):
         elif listitem.status == "DROPPED":
             status = str(item.status)
 
-            if listitem.score > 0:
+            if hasattr(listitem, "score") > 0:
                 r, g, b = CListActivity.get_score_color(user, listitem.score)
                 color = discord.Color.from_rgb(r, g, b)
             else:
                 color = color_errr
 
         elif listitem.status == "PLANNING":
-            if listitem.repeat > 0:
+            if hasattr(listitem, "repeat") > 0:
                 status = f"Planning to {'Read' if is_manga else 'Watch'} Again"
             else:
                 status = str(item.status)
 
             if is_manga:
-                if item.media.chapters:
+                if hasattr(item.media, "chapters"):
                     progress = f"Total chapters: {str(item.media.chapters)} chapters - {str(item.media.volumes)} volumes"
                 else:
                     progress = "Total chapters: Not Available"
@@ -387,9 +396,12 @@ class CListActivity(ListActivity):
         embed = discord.Embed(
             title=item.media.title.romaji,
             url=item.media.url,
-            description=item.media.title.english
-            if hasattr(item.media.title, "english")
-            else item.media.title.native,
+            description=(
+                (item.media.title.english + "\n")
+                if hasattr(item.media.title, "english")
+                else (item.media.title.native + "\n")
+            )
+            + (f"Updated <t:{item.date.get_timestamp()}:D>"),
             color=color,
         )
         embed.add_field(
@@ -418,6 +430,68 @@ class CListActivity(ListActivity):
 
         embed.set_footer(
             text=f"{'Manga' if is_manga else 'Anime'} list of {item.username}",
+            icon_url=user.image.medium,
+        )
+
+        if channel:
+            try:
+                await channel.send(embed=embed)
+            except Exception as e:
+                logger.info(
+                    f"Cannot send message -> {str(channel.id)} : {item.username} {e}"
+                )
+        else:
+            return embed
+
+
+class CTextActivity(TextActivity):
+
+    username = None
+
+    @staticmethod
+    def create(obj: TextActivity, username) -> "CTextActivity":
+        obj.__class__ = CTextActivity
+        obj.username = username
+
+        return obj
+
+    @staticmethod
+    async def send_embed(
+        item: "CTextActivity", anilist: AsyncClient, channel: discord.TextChannel = None
+    ) -> Optional[discord.Embed]:
+
+        user = await anilist.get_user(item.username)
+        if not user:
+            return None
+
+        user = CUser.create(user)
+
+        color = discord.Color.from_rgb(
+            user.profile_color[0], user.profile_color[1], user.profile_color[2]
+        )
+
+        embed = discord.Embed(
+            title=f"{item.username} updated their status",
+            url=item.url if hasattr(item, "url") else "https://anilist.co/",
+            description=f"Sent <t:{item.date.get_timestamp()}:D>",
+            color=color,
+        )
+
+        if hasattr(item, "text"):
+            embed.add_field(
+                name="Message",
+                value=item.text,
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="ERROR",
+                value="`An error occured fetching this activity.`",
+                inline=False,
+            )
+
+        embed.set_footer(
+            text=f"Status activity of {item.username}",
             icon_url=user.image.medium,
         )
 

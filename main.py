@@ -136,7 +136,7 @@ async def update_roles(minutes: int):
 
 try:
     client.loop.create_task(client.get_cog("Controller").process())
-    client.loop.create_task(update_roles(minutes=15))
+    client.loop.create_task(update_roles(minutes=3))
     client.run(TOKEN)
 except KeyboardInterrupt:
     print("exit")

@@ -25,6 +25,7 @@ class Database:
                 (
                     (where("username") == item["username"])
                     & (where("channel") == item["channel"])
+                    & (where("type") == item["type"])
                 ),
             )
         except:

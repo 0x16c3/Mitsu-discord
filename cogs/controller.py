@@ -11,12 +11,13 @@ from discord_slash.model import SlashCommandOptionType
 # utilities
 from .utils import *
 from .api.database import database
-from .api.types import CUser, CAnime, CManga, CListActivity
+from .api.types import CUser, CAnime, CManga, CListActivity, CTextActivity
+from typing import Union
 
 
 class Feed:
 
-    TYPE = {"ANIME": 0, "MANGA": 1}
+    TYPE = {"ANIME": 0, "MANGA": 1, "TEXT": 2}
 
     def get_type(self, i: any):
         return list(self.TYPE.keys())[list(self.TYPE.values()).index(i)]
@@ -43,12 +44,24 @@ class Feed:
                 "id": self.username,
                 "content_type": "manga",
             }
+        if self.feed == self.TYPE["TEXT"]:
+            self.type = CTextActivity
+            self.function = anilist.get_activity
+            self.arguments = {
+                "id": self.username,
+                "content_type": "text",
+            }
 
         self.entries = []
         self.entries_processed = []
         self._init = False
 
-    async def retrieve(self) -> Dict[List[CListActivity], List[CListActivity]]:
+    async def retrieve(
+        self,
+    ) -> Dict[
+        List[Union[CListActivity, CTextActivity]],
+        List[Union[CListActivity, CTextActivity]],
+    ]:
         try:
             ret = await self.function(**self.arguments)
 
@@ -81,8 +94,9 @@ class Feed:
         for item in feed:
             if item.id in (i.id for i in self.entries_processed):
                 continue
-            if item.media.id in (i.media.id for i in self.entries):
-                continue
+            if self.type == CListActivity:
+                if item.media.id in (i.media.id for i in self.entries):
+                    continue
 
             self.entries.insert(0, item)
             logger.info("Added " + str(item.id))
@@ -102,6 +116,8 @@ class Feed:
                     )
 
             if self.type == CListActivity:
+                self.entries_processed.insert(0, item)
+            elif self.type == CTextActivity:
                 self.entries_processed.insert(0, item)
 
             self.entries.remove(item)
@@ -144,20 +160,27 @@ class Feed:
         return
 
 
-class AnimeFeed:
+class Activity:
     def __init__(
-        self, username: str, channel: discord.TextChannel, profile: CUser
+        self,
+        username: str,
+        channel: discord.TextChannel,
+        profile: CUser,
+        type: Union[str, int] = "ANIME",
     ) -> None:
         self.username = username
         self.channel = channel
         self.profile = profile
 
-        self.feed_anime = Feed(username, Feed.TYPE["ANIME"])
+        self.type = Feed.TYPE[type] if isinstance(type, str) else type
+        self.feed = Feed(username, self.type)
 
         self.loop = None
 
     @staticmethod
-    async def create(username: str, channel: discord.TextChannel) -> "AnimeFeed":
+    async def create(
+        username: str, channel: discord.TextChannel, type: Union[int, str] = "ANIME"
+    ) -> "Activity":
 
         try:
             profile = await anilist.get_user(name=username)
@@ -165,38 +188,42 @@ class AnimeFeed:
         except:
             return None
 
-        return AnimeFeed(username, channel, profile)
+        return Activity(username, channel, profile, type)
 
     async def get_feed(
         self, feed: Feed
-    ) -> Dict[List[CListActivity], List[CListActivity]]:
+    ) -> Dict[
+        List[Union[CListActivity, CTextActivity]],
+        List[Union[CListActivity, CTextActivity]],
+    ]:
 
         items, items_full = await feed.retrieve()
-
-        if len(items) == 0:
-            return []
 
         await feed.update(items, items_full)
         return items, items_full
 
     def __repr__(self):
-        return "<AnimeFeed: {}:{}>".format(self.username, str(self.channel.id))
+        return "<Activity: {}:{}>".format(self.username, str(self.channel.id))
 
-    def __eq__(self, o: "AnimeFeed"):
-        return "<AnimeFeed: {}:{}>".format(self.username, str(self.channel.id)) == str(
-            o
-        )
+    def __eq__(self, o: "Activity"):
+        return "<Activity: {}:{}>".format(self.username, str(self.channel.id)) == str(o)
 
     def JSON(self):
         return json.loads(
-            json.dumps({"username": self.username, "channel": str(self.channel.id)})
+            json.dumps(
+                {
+                    "username": self.username,
+                    "channel": str(self.channel.id),
+                    "type": str(self.type),
+                }
+            )
         )
 
 
 class Controller(commands.Cog):
     def __init__(self, client):
         self.client = client
-        self.feeds: List[AnimeFeed] = []
+        self.feeds: List[Activity] = []
 
     async def on_ready(self):
         items = await database.feed_get()
@@ -206,19 +233,23 @@ class Controller(commands.Cog):
             channel = self.client.get_channel(int(item["channel"]))
 
             if not channel:
-                logger.debug(f"Could not load <{item['username']}:{item['channel']}>")
+                logger.debug(
+                    f"Could not load <{item['username']}:{item['channel']}:{item['type']}>"
+                )
                 await database.feed_remove([item])
                 continue
 
-            user: AnimeFeed = await AnimeFeed.create(item["username"], channel)
+            user: Activity = await Activity.create(
+                item["username"], channel, int(item["type"])
+            )
             self.feeds.append(user)
 
         for user in self.feeds:
-            user: AnimeFeed
+            user: Activity
 
-            await user.get_feed(user.feed_anime)
-            await user.feed_anime.process_entries(
-                user.feed_anime.type.send_embed,
+            await user.get_feed(user.feed)
+            await user.feed.process_entries(
+                user.feed.type.send_embed,
                 channel=user.channel,
                 anilist=anilist,
             )
@@ -228,36 +259,48 @@ class Controller(commands.Cog):
     async def process(self):
 
         while True:
-            for user in self.feeds:
-                user: AnimeFeed
 
-                await user.get_feed(user.feed_anime)
-                await user.feed_anime.process_entries(
-                    user.feed_anime.type.send_embed,
+            await asyncio.sleep(int(config["INTERVAL"]))
+
+            for user in self.feeds:
+                user: Activity
+
+                await user.get_feed(user.feed)
+                await user.feed.process_entries(
+                    user.feed.type.send_embed,
                     channel=user.channel,
                     anilist=anilist,
                 )
-
-            await asyncio.sleep(int(config["INTERVAL"]))
 
     async def get_anime(self, query: str) -> CAnime:
         pass
 
     @cog_ext.cog_slash(
         name="setup",
-        description="Setup RSS feed in current channel.",
+        description="Setup activity feed in current channel.",
         guild_ids=get_all_guild_ids(),
         permissions=get_all_permissions(),
         options=[
             create_option(
                 name="username",
-                description="MyAnimeList username.",
+                description="AniList username.",
                 option_type=SlashCommandOptionType.STRING,
                 required=True,
             ),
+            create_option(
+                name="type",
+                description="Activity type. (Default: Anime)",
+                option_type=SlashCommandOptionType.INTEGER,
+                required=False,
+                choices=[
+                    create_choice(name=k.title(), value=v) for k, v in Feed.TYPE.items()
+                ],
+            ),
         ],
     )
-    async def _setup(self, ctx: SlashContext, username: str):
+    async def _setup(
+        self, ctx: SlashContext, username: str, type: int = Feed.TYPE["ANIME"]
+    ):
 
         if not ctx.author.permissions_in(ctx.channel).manage_webhooks:
             await ctx.send(
@@ -267,7 +310,7 @@ class Controller(commands.Cog):
 
         await ctx.defer(hidden=True)
 
-        user: AnimeFeed = await AnimeFeed.create(username, ctx.channel)
+        user: Activity = await Activity.create(username, ctx.channel, type)
 
         if not user:
             embed = discord.Embed(
@@ -281,24 +324,26 @@ class Controller(commands.Cog):
             await ctx.send(" ឵឵", embed=embed, hidden=True)
             return
 
-        if user not in self.feeds:
+        if user not in [
+            i for i in self.feeds if i.type == user.type and i.channel == user.channel
+        ]:
             self.feeds.append(user)
             await database.feed_insert([user.JSON()])
             embed = discord.Embed(
                 title="Done!",
-                description=f"This channel will now track the anime list of {user.username}",
+                description=f"This channel will now track the {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].lower()} list of {user.username}",
                 color=color_done,
             )
         else:
             embed = discord.Embed(
                 title="Could not start tracking!",
-                description=f"This channel is already tracking {user.username}!",
+                description=f"This channel is already tracking {user.username}'s {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].lower()} list!",
                 color=color_warn,
             )
 
-        await user.get_feed(user.feed_anime)
-        await user.feed_anime.process_entries(
-            user.feed_anime.type.send_embed,
+        await user.get_feed(user.feed)
+        await user.feed.process_entries(
+            user.feed.type.send_embed,
             channel=user.channel,
             profile=user.profile,
         )
@@ -313,13 +358,24 @@ class Controller(commands.Cog):
         options=[
             create_option(
                 name="username",
-                description="MyAnimeList username.",
+                description="AniList username.",
                 option_type=SlashCommandOptionType.STRING,
                 required=True,
             ),
+            create_option(
+                name="type",
+                description="Activity type. (Default: Anime)",
+                option_type=SlashCommandOptionType.INTEGER,
+                required=False,
+                choices=[
+                    create_choice(name=k.title(), value=v) for k, v in Feed.TYPE.items()
+                ],
+            ),
         ],
     )
-    async def _remove(self, ctx: SlashContext, username: str):
+    async def _remove(
+        self, ctx: SlashContext, username: str, type: int = Feed.TYPE["ANIME"]
+    ):
 
         if not ctx.author.permissions_in(ctx.channel).manage_webhooks:
             await ctx.send(
@@ -332,18 +388,26 @@ class Controller(commands.Cog):
         if any(
             user
             for user in self.feeds
-            if user.username == username and user.channel == ctx.channel
+            if (
+                user.username == username
+                and user.channel == ctx.channel
+                and user.type == type
+            )
         ):
             user = next(
                 user
                 for user in self.feeds
-                if user.username == username and user.channel == ctx.channel
+                if (
+                    user.username == username
+                    and user.channel == ctx.channel
+                    and user.type == type
+                )
             )
             self.feeds.remove(user)
             await database.feed_remove([user.JSON()])
             embed = discord.Embed(
                 title="Done!",
-                description=f"This channel will now stop tracking the anime list of {user.username}",
+                description=f"This channel will now stop tracking the {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].lower()} list of {user.username}",
                 color=color_done,
             )
             del user
@@ -393,11 +457,19 @@ class Controller(commands.Cog):
                 if feed and feed.channel and feed.channel.guild == ctx.guild
             )
 
-        def format_str(feed: AnimeFeed) -> str:
+        def format_str(feed: Activity) -> str:
             if scope == SCOPE["This channel"]:
-                return feed.username
+                return (
+                    feed.username
+                    + f" ({list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].title()})"
+                )
             elif scope == SCOPE["Whole server"]:
-                return feed.username + " -> #" + feed.channel.name
+                return (
+                    feed.username
+                    + f" ({list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].title()})"
+                    + " -> #"
+                    + feed.channel.name
+                )
 
         await ctx.send(
             "```\n" + "\n".join((format_str(feed) for feed in items)) + "```",
@@ -411,7 +483,7 @@ class Controller(commands.Cog):
         options=[
             create_option(
                 name="username",
-                description="MyAnimeList username.",
+                description="AniList username.",
                 option_type=SlashCommandOptionType.STRING,
                 required=True,
             ),

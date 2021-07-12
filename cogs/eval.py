@@ -11,7 +11,7 @@ from tinydb.queries import where
 from cogs.controller import (
     Controller,
     Feed,
-    AnimeFeed,
+    Activity,
 )
 from cogs.api.types import (
     CAnime,
@@ -97,7 +97,7 @@ class Eval(commands.Cog):
             "json": json,
             "Controller": Controller,
             "Feed": Feed,
-            "AnimeFeed": AnimeFeed,
+            "AnimeFeed": Activity,
             "Database": Database,
             "database": database,
             "TinyDB": TinyDB,
