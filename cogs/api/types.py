@@ -3,7 +3,7 @@ import discord
 import asyncio
 
 # utilities
-import math
+import re
 from PIL import Image
 import urllib.request, io
 from typing import Optional, Tuple, Union
@@ -473,9 +473,23 @@ class CTextActivity(TextActivity):
         embed = discord.Embed(
             title=f"{item.username} updated their status",
             url=item.url if hasattr(item, "url") else "https://anilist.co/",
-            description=f"Sent <t:{item.date.get_timestamp()}:D>",
+            description=f"Sent <t:{item.date.get_timestamp()}:R>",
             color=color,
         )
+
+        regex = re.findall(
+            r"(img[0-9]+\()(http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+)(\))$",
+            item.text,
+        )
+        count = 0
+        for i in regex:
+            count += 1
+
+            if count > 4:
+                item.text = item.text.replace("".join(i), i[1])
+            else:
+                item.text = item.text.replace("".join(i), "")
+                embed.set_image(url=i[1])
 
         if hasattr(item, "text"):
             embed.add_field(
