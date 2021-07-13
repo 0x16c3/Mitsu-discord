@@ -272,8 +272,33 @@ class Controller(commands.Cog):
                     anilist=anilist,
                 )
 
-    async def get_anime(self, query: str) -> CAnime:
-        pass
+    @cog_ext.cog_slash(
+        name="search",
+        description="Search for media.",
+        guild_ids=get_all_guild_ids(),
+        options=[
+            create_option(
+                name="media",
+                description="Media type to search.",
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+                choices=[
+                    create_choice(name="Anime", value="anime"),
+                    create_choice(name="Manga", value="manga"),
+                    create_choice(name="Character", value="character"),
+                ],
+            ),
+            create_option(
+                name="query",
+                description="Search query.",
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+        ],
+    )
+    async def _search(self, ctx: SlashContext, media: str, query: str) -> CAnime:
+        results = anilist.search(query, content_type=media, page=1, limit=5)
+        await ctx.send([i.title for i in results])
 
     @cog_ext.cog_slash(
         name="setup",
@@ -352,7 +377,7 @@ class Controller(commands.Cog):
 
     @cog_ext.cog_slash(
         name="remove",
-        description="Remove active RSS feed in current channel.",
+        description="Remove active feed in current channel.",
         guild_ids=get_all_guild_ids(),
         permissions=get_all_permissions(),
         options=[
