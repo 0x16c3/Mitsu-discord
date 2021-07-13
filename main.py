@@ -40,6 +40,11 @@ async def on_ready():
         status=discord.Status.online,
     )
 
+    # sync commands
+    logger.debug("Syncing commands")
+    await slash.sync_all_commands()
+    logger.debug("Synced commands")
+
     # setup all feeds
     await client.get_cog("Controller").on_ready()
 

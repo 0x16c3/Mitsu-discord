@@ -4,9 +4,15 @@ from discord.ext import commands
 import asyncio
 
 # for slash commands
-from discord_slash import cog_ext, SlashContext
+from discord_slash import cog_ext, SlashContext, ComponentContext
 from discord_slash.utils.manage_commands import create_option, create_choice
 from discord_slash.model import SlashCommandOptionType
+from discord_slash.utils.manage_components import (
+    create_select,
+    create_select_option,
+    create_actionrow,
+    wait_for_component,
+)
 
 # utilities
 from .utils import *
@@ -65,6 +71,9 @@ class Feed:
         try:
             ret = await self.function(**self.arguments)
 
+            if not ret:
+                return [], []
+
             res = []
             for item in ret:
                 obj = self.type.create(item, self.username)
@@ -72,7 +81,7 @@ class Feed:
 
         except Exception as e:
             logger.print("Error on {}: {}".format(self.username, e))
-            return []
+            return [], []
 
         return res[:15], res
 
@@ -275,7 +284,7 @@ class Controller(commands.Cog):
     @cog_ext.cog_slash(
         name="search",
         description="Search for media.",
-        guild_ids=get_all_guild_ids(),
+        guild_ids=get_debug_guild_id(),
         options=[
             create_option(
                 name="media",
@@ -285,7 +294,6 @@ class Controller(commands.Cog):
                 choices=[
                     create_choice(name="Anime", value="anime"),
                     create_choice(name="Manga", value="manga"),
-                    create_choice(name="Character", value="character"),
                 ],
             ),
             create_option(
@@ -297,14 +305,89 @@ class Controller(commands.Cog):
         ],
     )
     async def _search(self, ctx: SlashContext, media: str, query: str) -> CAnime:
-        results = anilist.search(query, content_type=media, page=1, limit=5)
-        await ctx.send([i.title for i in results])
+        results: List[Union[CAnime, CManga]] = await anilist.search(
+            query, content_type=media, page=1, limit=5
+        )
+        select = create_select(
+            options=[
+                create_select_option(
+                    label=(
+                        i.title.romaji
+                        if len(i.title.romaji) <= 25
+                        else i.title.romaji[:22] + "..."
+                    ),
+                    description=(
+                        i.title.english
+                        if len(i.title.english) <= 50
+                        else i.title.english[:47] + "..."
+                    ),
+                    value=str(i.id),
+                )
+                for i in results
+            ],
+            placeholder="Choose one of the results",
+            min_values=1,
+            max_values=1,
+        )
+        actionrow = create_actionrow(select)
+
+        await ctx.send("Here are your search results!", components=[actionrow])
+
+        while True:
+            try:
+                button_ctx: ComponentContext = await wait_for_component(
+                    self.client, components=actionrow, timeout=120
+                )
+
+                selected: int = int(button_ctx.selected_options[0])
+                selected = await anilist.get(id=selected, content_type=media)
+
+                if media == "anime":
+                    selected: CAnime = CAnime.create(selected)
+                elif media == "manga":
+                    selected: CManga = CManga.create(selected)
+
+                embed = await selected.send_embed()
+
+                select = create_select(
+                    options=[
+                        create_select_option(
+                            label=(
+                                i.title.romaji
+                                if len(i.title.romaji) <= 25
+                                else i.title.romaji[:22] + "..."
+                            ),
+                            description=(
+                                i.title.english
+                                if len(i.title.english) <= 50
+                                else i.title.english[:47] + "..."
+                            ),
+                            value=str(i.id),
+                            default=(str(i.id) == str(selected.id)),
+                        )
+                        for i in results
+                    ],
+                    placeholder="Choose one of the results",
+                    min_values=1,
+                    max_values=1,
+                )
+                actionrow = create_actionrow(select)
+
+                await button_ctx.edit_origin(
+                    content="Here are your search results!",
+                    components=[actionrow],
+                    embed=embed,
+                )
+
+            except:
+                break
+
+        return
 
     @cog_ext.cog_slash(
         name="setup",
         description="Setup activity feed in current channel.",
-        guild_ids=get_all_guild_ids(),
-        permissions=get_all_permissions(),
+        guild_ids=get_debug_guild_id(),
         options=[
             create_option(
                 name="username",
@@ -335,7 +418,7 @@ class Controller(commands.Cog):
 
         await ctx.defer(hidden=True)
 
-        user: Activity = await Activity.create(username, ctx.channel, type)
+        user: Activity = await Activity.create(username, ctx.channel, int(type))
 
         if not user:
             embed = discord.Embed(
@@ -378,8 +461,7 @@ class Controller(commands.Cog):
     @cog_ext.cog_slash(
         name="remove",
         description="Remove active feed in current channel.",
-        guild_ids=get_all_guild_ids(),
-        permissions=get_all_permissions(),
+        guild_ids=get_debug_guild_id(),
         options=[
             create_option(
                 name="username",
@@ -448,8 +530,7 @@ class Controller(commands.Cog):
     @cog_ext.cog_slash(
         name="active",
         description="See active feeds.",
-        guild_ids=get_all_guild_ids(),
-        permissions=get_all_permissions(),
+        guild_ids=get_debug_guild_id(),
         options=[
             create_option(
                 name="scope",
@@ -504,7 +585,7 @@ class Controller(commands.Cog):
     @cog_ext.cog_slash(
         name="profile",
         description="Get user profile.",
-        guild_ids=get_all_guild_ids(),
+        guild_ids=get_debug_guild_id(),
         options=[
             create_option(
                 name="username",

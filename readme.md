@@ -29,11 +29,15 @@
 - Install requirements.
   `pip install -r requirements.txt`
 
-- Setup Token & Custom Jikan URL
+- Setup Token & Slash Command Test Guild
 
   1. Create and enter the directory `tmp`.
   2. Create a text file and name it `token.txt`.
   3. Paste your Discord bot token into the file.
+
+  For developers:
+    Set `SLASH_TEST_GUILD` as your test server's if you're going to add or edit commands.
+    Otherwise you'd need to wait at least a couple of hours for the commands to sync.
 
   For further configuration, check out `tmp/config.ini`
 

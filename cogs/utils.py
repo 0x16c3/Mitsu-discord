@@ -2,7 +2,7 @@ import discord
 import json
 import os
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 import configparser
 
 # anilist
@@ -84,8 +84,8 @@ def get_all_guild_ids() -> List[int]:
     ids = []
 
     for guild in client.guilds:
-        guild: discord.Guild
         ids.append(guild.id)
+        print(guild.name)
 
     return ids
 
@@ -217,6 +217,9 @@ if not os.path.isfile("tmp/config.ini"):
     fp.write("INTERVAL = 60\n")
     fp.write("; maximum list items that a RssFeed object can contain\n")
     fp.write("MEMORY_LIMIT = 25\n")
+    fp.write("; set this to your test server's id for the commands to update faster.\n")
+    fp.write("; you need to have the --debug option.\n")
+    fp.write("SLASH_TEST_GUILD = -1\n")
     fp.close()
 
 cfgparser.read("tmp/config.ini", encoding="utf-8-sig")
@@ -227,6 +230,23 @@ logger.print(
     f'  INTERVAL = {config["INTERVAL"]}\n'
     f'  MEMORY_LIMIT = {config["MEMORY_LIMIT"]}\n'
 )
+
+
+def get_debug_guild_id() -> Optional[List[int]]:
+
+    if not config["SLASH_TEST_GUILD"].isdecimal():
+        return None
+
+    if not logger._debug:
+        return None
+
+    if int(config["SLASH_TEST_GUILD"]) == -1:
+        return None
+
+    logger.debug(f"Syncing commands only in guild {config['SLASH_TEST_GUILD']}")
+    return [int(config["SLASH_TEST_GUILD"])]
+
+
 """"""
 
 """

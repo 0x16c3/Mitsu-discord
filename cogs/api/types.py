@@ -466,12 +466,17 @@ class CTextActivity(TextActivity):
 
         user = CUser.create(user)
 
+        if not hasattr(item, "user"):
+            return None
+
+        item.user = user
+
         color = discord.Color.from_rgb(
             user.profile_color[0], user.profile_color[1], user.profile_color[2]
         )
 
         embed = discord.Embed(
-            title=f"{item.username} updated their status",
+            title=f"New post on {item.username}'s profile!",
             url=item.url if hasattr(item, "url") else "https://anilist.co/",
             description=f"Sent <t:{item.date.get_timestamp()}:R>",
             color=color,
@@ -493,7 +498,7 @@ class CTextActivity(TextActivity):
 
         if hasattr(item, "text"):
             embed.add_field(
-                name="Message",
+                name=f"Sent by {item.user.name}",
                 value=item.text,
                 inline=False,
             )
@@ -504,6 +509,7 @@ class CTextActivity(TextActivity):
                 inline=False,
             )
 
+        embed.set_thumbnail(url=item.user.image.large)
         embed.set_footer(
             text=f"Status activity of {item.username}",
             icon_url=user.image.medium,
