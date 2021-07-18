@@ -221,10 +221,14 @@ class Activity:
         return items, items_full
 
     def __repr__(self):
-        return "<Activity: {}:{}>".format(self.username, str(self.channel.id))
+        return "<Activity: {}:{}:{}>".format(
+            self.username, str(self.channel.id), str(self.type)
+        )
 
     def __eq__(self, o: "Activity"):
-        return "<Activity: {}:{}>".format(self.username, str(self.channel.id)) == str(o)
+        return "<Activity: {}:{}:{}>".format(
+            self.username, str(self.channel.id), str(self.type)
+        ) == str(o)
 
     def JSON(self):
         return json.loads(
@@ -329,7 +333,7 @@ class Controller(commands.Cog):
                 for k, v in Feed.TYPE.items()
             ],
             placeholder="Choose the activities you want to track.",
-            min_values=1,
+            min_values=0,
             max_values=len(Feed.TYPE),
         )
         actionrow = create_actionrow(select)
@@ -340,6 +344,8 @@ class Controller(commands.Cog):
 
         def check_author(cctx: ComponentContext):
             return ctx.author.id == cctx.author.id
+
+        selected = []
 
         try:
             button_ctx: ComponentContext = await wait_for_component(
@@ -360,7 +366,7 @@ class Controller(commands.Cog):
                     for k, v in Feed.TYPE.items()
                 ],
                 placeholder="Choose the activities you want to track.",
-                min_values=1,
+                min_values=0,
                 max_values=len(Feed.TYPE),
                 disabled=True,
             )
@@ -381,7 +387,7 @@ class Controller(commands.Cog):
                     for k, v in Feed.TYPE.items()
                 ],
                 placeholder="Choose the activities you want to track.",
-                min_values=1,
+                min_values=0,
                 max_values=len(Feed.TYPE),
                 disabled=True,
             )
@@ -407,8 +413,10 @@ class Controller(commands.Cog):
                 ),
                 color=color_errr,
             )
-            await button_ctx.send("_ _឵឵", embed=embed, hidden=True)
+            await button_ctx.edit_origin("_ _឵឵", embed=embed)
             return
+
+        user = None
 
         for i in selected:
             user: Activity = await Activity.create(username, ctx.channel, i, profile)
@@ -454,12 +462,13 @@ class Controller(commands.Cog):
                 name="Could Not Start Tracking", value="\n".join(activities_failed)
             )
 
-        await user.get_feed(user.feed)
-        await user.feed.process_entries(
-            user.feed.type.send_embed,
-            channel=user.channel,
-            profile=user.profile,
-        )
+        if user:
+            await user.get_feed(user.feed)
+            await user.feed.process_entries(
+                user.feed.type.send_embed,
+                channel=user.channel,
+                profile=user.profile,
+            )
 
         await message.edit(content="_ _", embed=embed, hidden=True)
 
@@ -556,7 +565,7 @@ class Controller(commands.Cog):
                         for k, v in Feed.TYPE.items()
                     ],
                     placeholder="Choose the activities you want to track.",
-                    min_values=1,
+                    min_values=0,
                     max_values=len(Feed.TYPE),
                     disabled=False,
                 )
@@ -566,6 +575,8 @@ class Controller(commands.Cog):
                     content="Active feeds in this channel",
                     components=[actionrow, actionrow_feed],
                 )
+
+                selected = []
 
                 try:
                     button_ctx: ComponentContext = await wait_for_component(
@@ -609,7 +620,7 @@ class Controller(commands.Cog):
                             for k, v in Feed.TYPE.items()
                         ],
                         placeholder="Choose the activities you want to track.",
-                        min_values=1,
+                        min_values=0,
                         max_values=len(Feed.TYPE),
                         disabled=True,
                     )
@@ -650,7 +661,7 @@ class Controller(commands.Cog):
                             for k, v in Feed.TYPE.items()
                         ],
                         placeholder="Choose the activities you want to track.",
-                        min_values=1,
+                        min_values=0,
                         max_values=len(Feed.TYPE),
                         disabled=True,
                     )
@@ -676,8 +687,10 @@ class Controller(commands.Cog):
                         ),
                         color=color_errr,
                     )
-                    await button_ctx.send("_ _឵឵", embed=embed, hidden=True)
+                    await button_ctx.edit_origin("_ _឵឵", embed=embed)
                     return
+
+                user = None 
 
                 for i in selected:
                     user: Activity = await Activity.create(
@@ -724,12 +737,13 @@ class Controller(commands.Cog):
                         value="\n".join(activities_failed),
                     )
 
-                await user.get_feed(user.feed)
-                await user.feed.process_entries(
-                    user.feed.type.send_embed,
-                    channel=user.channel,
-                    profile=user.profile,
-                )
+                if user:
+                    await user.get_feed(user.feed)
+                    await user.feed.process_entries(
+                        user.feed.type.send_embed,
+                        channel=user.channel,
+                        profile=user.profile,
+                    )
 
             except:
                 await message.delete()
@@ -811,10 +825,11 @@ class Controller(commands.Cog):
             ),
         ],
     )
-    async def _get_profile(
-        self, ctx: SlashContext, username: str, send_message: bool = False
-    ):
-        send_message = not send_message
+    async def _get_profile(self, ctx: SlashContext, username: str, **kwargs):
+        if not "send-message" in kwargs:
+            kwargs["send-message"] = False
+
+        send_message = not kwargs["send-message"]
         await ctx.defer(hidden=send_message)
 
         try:

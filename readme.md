@@ -13,17 +13,17 @@
 
 ### Usage
 
-|                                                  |                                                                  |
-| ------------------------------------------------ | ---------------------------------------------------------------- |
-| **Helper functions**                             |                                                                  |
-| `mitsu`                                          | `meta information`                                               |
-| .                                                |                                                                  |
-| **Commands**                                     |                                                                  |
-| `/setup <username> [type (Anime, Manga, Text)]`  | `setup AniList anime feed in current channel (Manage Webhooks)`  |
-| `/remove <username> [type (Anime, Manga, Text)]` | `remove AniList anime feed in current channel (Manage Webhooks)` |
-| `/active [scope (This channel, Whole server)]`   | `send active feeds in the specified scope`                       |
-| `/profile <username>`                            | `get AniList profile of specified user`                          |
-| `/search <type (Anime, Manga)> <query>`          | `search anime or manga`                                          |
+|                                         |                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------- |
+| **Helper functions**                    |                                                                  |
+| `mitsu`                                 | `meta information`                                               |
+| .                                       |                                                                  |
+| **Commands**                            |                                                                  |
+| `/setup <username>`                     | `setup AniList anime feed in current channel (Manage Webhooks)`  |
+| `/remove <username>`                    | `remove AniList anime feed in current channel (Manage Webhooks)` |
+| `/active [scope]`                       | `send active feeds in the specified scope`                       |
+| `/profile <username> [send]`            | `get AniList profile of specified user`                          |
+| `/search <type (Anime, Manga)> <query>` | `search anime or manga`                                          |
 
 ### Running & configuration
 
