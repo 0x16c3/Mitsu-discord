@@ -25,8 +25,9 @@ class Feed:
 
     TYPE = {"ANIME": 0, "MANGA": 1, "TEXT": 2}
 
-    def get_type(self, i: any):
-        return list(self.TYPE.keys())[list(self.TYPE.values()).index(i)]
+    @staticmethod
+    def get_type(i: any):
+        return list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)]
 
     def __init__(self, username: str, feed: int) -> None:
         self.username = username
@@ -88,6 +89,10 @@ class Feed:
     async def update(self, feed: list, feed_full: list) -> None:
 
         if not self._init:
+            if not len(feed):
+                logger.info("Could not initialize " + str(self))
+                return
+
             for item in feed:
                 self.entries_processed.append(item)
 
@@ -175,29 +180,33 @@ class Activity:
         username: str,
         channel: discord.TextChannel,
         profile: CUser,
-        type: Union[str, int] = "ANIME",
+        t: Union[str, int] = "ANIME",
     ) -> None:
         self.username = username
         self.channel = channel
         self.profile = profile
 
-        self.type = Feed.TYPE[type] if isinstance(type, str) else type
+        self.type = Feed.TYPE[t] if isinstance(t, str) else t
         self.feed = Feed(username, self.type)
 
         self.loop = None
 
     @staticmethod
     async def create(
-        username: str, channel: discord.TextChannel, type: Union[int, str] = "ANIME"
+        username: str,
+        channel: discord.TextChannel,
+        t: Union[int, str] = "ANIME",
+        profile: CUser = None,
     ) -> "Activity":
 
-        try:
-            profile = await anilist.get_user(name=username)
-            profile = CUser.create(profile)
-        except:
-            return None
+        if not profile:
+            try:
+                profile = await anilist.get_user(name=username)
+                profile = CUser.create(profile)
+            except:
+                return None
 
-        return Activity(username, channel, profile, type)
+        return Activity(username, channel, profile, t)
 
     async def get_feed(
         self, feed: Feed
@@ -429,7 +438,7 @@ class Controller(commands.Cog):
                 ),
                 color=color_errr,
             )
-            await ctx.send(" ឵឵", embed=embed, hidden=True)
+            await ctx.send("_ _឵឵", embed=embed, hidden=True)
             return
 
         if user not in [
@@ -456,7 +465,7 @@ class Controller(commands.Cog):
             profile=user.profile,
         )
 
-        await ctx.send(" ឵឵", embed=embed, hidden=True)
+        await ctx.send("_ _឵឵", embed=embed, hidden=True)
 
     @cog_ext.cog_slash(
         name="remove",
@@ -525,7 +534,7 @@ class Controller(commands.Cog):
                 color=color_warn,
             )
 
-        await ctx.send(" ឵឵", embed=embed, hidden=True)
+        await ctx.send("_ _឵឵", embed=embed, hidden=True)
 
     @cog_ext.cog_slash(
         name="active",
@@ -616,11 +625,11 @@ class Controller(commands.Cog):
                 description=ex,
                 color=color_errr,
             )
-            await ctx.send(" ឵឵", embed=embed, hidden=True)
+            await ctx.send("_ _឵឵", embed=embed, hidden=True)
             return
 
         embed = await profile.send_embed()
-        await ctx.send(" ឵឵", embed=embed, hidden=send_message)
+        await ctx.send("_ _", embed=embed, hidden=send_message)
 
 
 def setup(client):
