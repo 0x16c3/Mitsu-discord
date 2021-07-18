@@ -13,16 +13,17 @@
 
 ### Usage
 
-|                       |                                                                  |
-| --------------------- | ---------------------------------------------------------------- |
-| **Helper functions**  |                                                                  |
-| `mitsu`               | `meta information`                                               |
-| .                     |                                                                  |
-| **Commands**          |                                                                  |
-| `/setup <username>`   | `setup AniList anime feed in current channel (Manage Webhooks)`  |
-| `/remove <username>`  | `remove AniList anime feed in current channel (Manage Webhooks)` |
-| `/active [scope]`     | `send active feeds in the specified scope`                       |
-| `/profile <username>` | `get AniList profile of specified user`                          |
+|                                                  |                                                                  |
+| ------------------------------------------------ | ---------------------------------------------------------------- |
+| **Helper functions**                             |                                                                  |
+| `mitsu`                                          | `meta information`                                               |
+| .                                                |                                                                  |
+| **Commands**                                     |                                                                  |
+| `/setup <username> [type (Anime, Manga, Text)]`  | `setup AniList anime feed in current channel (Manage Webhooks)`  |
+| `/remove <username> [type (Anime, Manga, Text)]` | `remove AniList anime feed in current channel (Manage Webhooks)` |
+| `/active [scope (This channel, Whole server)]`   | `send active feeds in the specified scope`                       |
+| `/profile <username>`                            | `get AniList profile of specified user`                          |
+| `/search <type (Anime, Manga)> <query>`          | `search anime or manga`                                          |
 
 ### Running & configuration
 
@@ -36,8 +37,8 @@
   3. Paste your Discord bot token into the file.
 
   For developers:
-    Set `SLASH_TEST_GUILD` as your test server's if you're going to add or edit commands.
-    Otherwise you'd need to wait at least a couple of hours for the commands to sync.
+  Set `SLASH_TEST_GUILD` as your test server's if you're going to add or edit commands.
+  Otherwise you'd need to wait at least a couple of hours for the commands to sync.
 
   For further configuration, check out `tmp/config.ini`
 

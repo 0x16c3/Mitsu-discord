@@ -25,8 +25,9 @@ class Feed:
 
     TYPE = {"ANIME": 0, "MANGA": 1, "TEXT": 2}
 
-    def get_type(self, i: any):
-        return list(self.TYPE.keys())[list(self.TYPE.values()).index(i)]
+    @staticmethod
+    def get_type(i: any):
+        return list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)]
 
     def __init__(self, username: str, feed: int) -> None:
         self.username = username
@@ -88,6 +89,10 @@ class Feed:
     async def update(self, feed: list, feed_full: list) -> None:
 
         if not self._init:
+            if not len(feed):
+                logger.info("Could not initialize " + str(self))
+                return
+
             for item in feed:
                 self.entries_processed.append(item)
 
@@ -175,29 +180,33 @@ class Activity:
         username: str,
         channel: discord.TextChannel,
         profile: CUser,
-        type: Union[str, int] = "ANIME",
+        t: Union[str, int] = "ANIME",
     ) -> None:
         self.username = username
         self.channel = channel
         self.profile = profile
 
-        self.type = Feed.TYPE[type] if isinstance(type, str) else type
+        self.type = Feed.TYPE[t] if isinstance(t, str) else t
         self.feed = Feed(username, self.type)
 
         self.loop = None
 
     @staticmethod
     async def create(
-        username: str, channel: discord.TextChannel, type: Union[int, str] = "ANIME"
+        username: str,
+        channel: discord.TextChannel,
+        t: Union[int, str] = "ANIME",
+        profile: CUser = None,
     ) -> "Activity":
 
-        try:
-            profile = await anilist.get_user(name=username)
-            profile = CUser.create(profile)
-        except:
-            return None
+        if not profile:
+            try:
+                profile = await anilist.get_user(name=username)
+                profile = CUser.create(profile)
+            except:
+                return None
 
-        return Activity(username, channel, profile, type)
+        return Activity(username, channel, profile, t)
 
     async def get_feed(
         self, feed: Feed
@@ -282,111 +291,8 @@ class Controller(commands.Cog):
                 )
 
     @cog_ext.cog_slash(
-        name="search",
-        description="Search for media.",
-        guild_ids=get_debug_guild_id(),
-        options=[
-            create_option(
-                name="media",
-                description="Media type to search.",
-                option_type=SlashCommandOptionType.STRING,
-                required=True,
-                choices=[
-                    create_choice(name="Anime", value="anime"),
-                    create_choice(name="Manga", value="manga"),
-                ],
-            ),
-            create_option(
-                name="query",
-                description="Search query.",
-                option_type=SlashCommandOptionType.STRING,
-                required=True,
-            ),
-        ],
-    )
-    async def _search(self, ctx: SlashContext, media: str, query: str) -> CAnime:
-        results: List[Union[CAnime, CManga]] = await anilist.search(
-            query, content_type=media, page=1, limit=5
-        )
-        select = create_select(
-            options=[
-                create_select_option(
-                    label=(
-                        i.title.romaji
-                        if len(i.title.romaji) <= 25
-                        else i.title.romaji[:22] + "..."
-                    ),
-                    description=(
-                        i.title.english
-                        if len(i.title.english) <= 50
-                        else i.title.english[:47] + "..."
-                    ),
-                    value=str(i.id),
-                )
-                for i in results
-            ],
-            placeholder="Choose one of the results",
-            min_values=1,
-            max_values=1,
-        )
-        actionrow = create_actionrow(select)
-
-        await ctx.send("Here are your search results!", components=[actionrow])
-
-        while True:
-            try:
-                button_ctx: ComponentContext = await wait_for_component(
-                    self.client, components=actionrow, timeout=120
-                )
-
-                selected: int = int(button_ctx.selected_options[0])
-                selected = await anilist.get(id=selected, content_type=media)
-
-                if media == "anime":
-                    selected: CAnime = CAnime.create(selected)
-                elif media == "manga":
-                    selected: CManga = CManga.create(selected)
-
-                embed = await selected.send_embed()
-
-                select = create_select(
-                    options=[
-                        create_select_option(
-                            label=(
-                                i.title.romaji
-                                if len(i.title.romaji) <= 25
-                                else i.title.romaji[:22] + "..."
-                            ),
-                            description=(
-                                i.title.english
-                                if len(i.title.english) <= 50
-                                else i.title.english[:47] + "..."
-                            ),
-                            value=str(i.id),
-                            default=(str(i.id) == str(selected.id)),
-                        )
-                        for i in results
-                    ],
-                    placeholder="Choose one of the results",
-                    min_values=1,
-                    max_values=1,
-                )
-                actionrow = create_actionrow(select)
-
-                await button_ctx.edit_origin(
-                    content="Here are your search results!",
-                    components=[actionrow],
-                    embed=embed,
-                )
-
-            except:
-                break
-
-        return
-
-    @cog_ext.cog_slash(
-        name="setup",
-        description="Setup activity feed in current channel.",
+        name="activity",
+        description="Manage activity feed in current channel.",
         guild_ids=get_debug_guild_id(),
         options=[
             create_option(
@@ -395,20 +301,9 @@ class Controller(commands.Cog):
                 option_type=SlashCommandOptionType.STRING,
                 required=True,
             ),
-            create_option(
-                name="type",
-                description="Activity type. (Default: Anime)",
-                option_type=SlashCommandOptionType.INTEGER,
-                required=False,
-                choices=[
-                    create_choice(name=k.title(), value=v) for k, v in Feed.TYPE.items()
-                ],
-            ),
         ],
     )
-    async def _setup(
-        self, ctx: SlashContext, username: str, type: int = Feed.TYPE["ANIME"]
-    ):
+    async def _activity(self, ctx: SlashContext, username: str):
 
         if not ctx.author.permissions_in(ctx.channel).manage_webhooks:
             await ctx.send(
@@ -416,11 +311,94 @@ class Controller(commands.Cog):
             )
             return
 
-        await ctx.defer(hidden=True)
+        select = create_select(
+            custom_id="_activity0",
+            options=[
+                create_select_option(
+                    label=k.title(),
+                    value=str(v),
+                    default=(
+                        v
+                        in [
+                            f.type
+                            for f in self.feeds
+                            if f.username == username and f.channel == ctx.channel
+                        ]
+                    ),
+                )
+                for k, v in Feed.TYPE.items()
+            ],
+            placeholder="Choose the activities you want to track.",
+            min_values=1,
+            max_values=len(Feed.TYPE),
+        )
+        actionrow = create_actionrow(select)
 
-        user: Activity = await Activity.create(username, ctx.channel, int(type))
+        message = await ctx.send(
+            content="Setting up activity feed", components=[actionrow], hidden=False
+        )
 
-        if not user:
+        def check_author(cctx: ComponentContext):
+            return ctx.author.id == cctx.author.id
+
+        try:
+            button_ctx: ComponentContext = await wait_for_component(
+                self.client, components=[actionrow], check=check_author, timeout=15
+            )
+
+            selected: List[int] = [int(i) for i in button_ctx.selected_options]
+            await button_ctx.defer(edit_origin=True)
+
+            select = create_select(
+                custom_id="_activity1",
+                options=[
+                    create_select_option(
+                        label=k.title(),
+                        value=str(v),
+                        default=v in selected,
+                    )
+                    for k, v in Feed.TYPE.items()
+                ],
+                placeholder="Choose the activities you want to track.",
+                min_values=1,
+                max_values=len(Feed.TYPE),
+                disabled=True,
+            )
+            actionrow = create_actionrow(select)
+            await message.edit(
+                content="Setting up activity feed",
+                components=[actionrow],
+            )
+        except:
+            select = create_select(
+                custom_id="_activity1",
+                options=[
+                    create_select_option(
+                        label=k.title(),
+                        value=str(v),
+                        default=v in selected,
+                    )
+                    for k, v in Feed.TYPE.items()
+                ],
+                placeholder="Choose the activities you want to track.",
+                min_values=1,
+                max_values=len(Feed.TYPE),
+                disabled=True,
+            )
+            actionrow = create_actionrow(select)
+            await message.edit(
+                content="Setting up activity feed",
+                components=[actionrow],
+            )
+            return
+
+        activities = []
+        activities_failed = []
+
+        try:
+            profile = await anilist.get_user(name=username)
+            profile = CUser.create(profile)
+        except:
             embed = discord.Embed(
                 title="Could not start tracking!",
                 description=(
@@ -429,24 +407,51 @@ class Controller(commands.Cog):
                 ),
                 color=color_errr,
             )
-            await ctx.send(" ឵឵", embed=embed, hidden=True)
+            await button_ctx.send("_ _឵឵", embed=embed, hidden=True)
             return
 
-        if user not in [
-            i for i in self.feeds if i.type == user.type and i.channel == user.channel
+        for i in selected:
+            user: Activity = await Activity.create(username, ctx.channel, i, profile)
+
+            if not user:
+                activities_failed.append(
+                    f"`{list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].title()}`"
+                )
+                continue
+
+            if user not in [
+                i
+                for i in self.feeds
+                if i.type == user.type and i.channel == user.channel
+            ]:
+                self.feeds.append(user)
+                await database.feed_insert([user.JSON()])
+                activities.append(
+                    f"`Started {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].lower()}`"
+                )
+        for i in [
+            x
+            for x in self.feeds
+            if x.username == username
+            and x.channel == ctx.channel
+            and x.type not in selected
         ]:
-            self.feeds.append(user)
-            await database.feed_insert([user.JSON()])
-            embed = discord.Embed(
-                title="Done!",
-                description=f"This channel will now track the {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].lower()} list of {user.username}",
-                color=color_done,
+            self.feeds.remove(i)
+            await database.feed_remove([i.JSON()])
+            activities.append(
+                f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
             )
-        else:
-            embed = discord.Embed(
-                title="Could not start tracking!",
-                description=f"This channel is already tracking {user.username}'s {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].lower()} list!",
-                color=color_warn,
+
+        embed = discord.Embed(
+            title="Done!",
+            description=f"This channel will now track the following activities of {username}",
+            color=color_done if len(activities_failed) == 0 else color_warn,
+        )
+        if len(activities) >= 1:
+            embed.add_field(name="Tracking", value="\n".join(activities))
+        if len(activities_failed) >= 1:
+            embed.add_field(
+                name="Could Not Start Tracking", value="\n".join(activities_failed)
             )
 
         await user.get_feed(user.feed)
@@ -456,33 +461,14 @@ class Controller(commands.Cog):
             profile=user.profile,
         )
 
-        await ctx.send(" ឵឵", embed=embed, hidden=True)
+        await message.edit(content="_ _", embed=embed, hidden=True)
 
     @cog_ext.cog_slash(
-        name="remove",
-        description="Remove active feed in current channel.",
+        name="edit",
+        description="Manage active feeds in the current channel.",
         guild_ids=get_debug_guild_id(),
-        options=[
-            create_option(
-                name="username",
-                description="AniList username.",
-                option_type=SlashCommandOptionType.STRING,
-                required=True,
-            ),
-            create_option(
-                name="type",
-                description="Activity type. (Default: Anime)",
-                option_type=SlashCommandOptionType.INTEGER,
-                required=False,
-                choices=[
-                    create_choice(name=k.title(), value=v) for k, v in Feed.TYPE.items()
-                ],
-            ),
-        ],
     )
-    async def _remove(
-        self, ctx: SlashContext, username: str, type: int = Feed.TYPE["ANIME"]
-    ):
+    async def _edit(self, ctx: SlashContext):
 
         if not ctx.author.permissions_in(ctx.channel).manage_webhooks:
             await ctx.send(
@@ -490,42 +476,266 @@ class Controller(commands.Cog):
             )
             return
 
-        await ctx.defer(hidden=True)
+        items = [
+            feed
+            for feed in self.feeds
+            if feed and feed.channel and feed.channel == ctx.channel
+        ]
 
-        if any(
-            user
-            for user in self.feeds
-            if (
-                user.username == username
-                and user.channel == ctx.channel
-                and user.type == type
+        if not len(items):
+            await ctx.send(
+                f"No active feeds in this channel",
+                hidden=True,
             )
-        ):
-            user = next(
-                user
-                for user in self.feeds
-                if (
-                    user.username == username
-                    and user.channel == ctx.channel
-                    and user.type == type
+
+        select = create_select(
+            custom_id="_edit0",
+            options=[
+                create_select_option(
+                    label=i if len(i) <= 25 else i[:22] + "...",
+                    description=", ".join(
+                        [Feed.get_type(f.type) for f in items if f.username == i]
+                    ),
+                    value=i,
                 )
-            )
-            self.feeds.remove(user)
-            await database.feed_remove([user.JSON()])
-            embed = discord.Embed(
-                title="Done!",
-                description=f"This channel will now stop tracking the {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].lower()} list of {user.username}",
-                color=color_done,
-            )
-            del user
-        else:
-            embed = discord.Embed(
-                title="Could not stop tracking!",
-                description=f"This channel is not tracking {username}!",
-                color=color_warn,
-            )
+                for i in list(set([item.username for item in items]))
+            ],
+            placeholder="Choose one of the feeds.",
+            min_values=1,
+            max_values=1,
+        )
+        actionrow = create_actionrow(select)
 
-        await ctx.send(" ឵឵", embed=embed, hidden=True)
+        message = await ctx.send(
+            content="Active feeds in this channel", components=[actionrow], hidden=False
+        )
+
+        def check_author(cctx: ComponentContext):
+            return ctx.author.id == cctx.author.id
+
+        while True:
+            try:
+                button_ctx: ComponentContext = await wait_for_component(
+                    self.client, components=actionrow, check=check_author, timeout=30
+                )
+
+                username: str = button_ctx.selected_options[0]
+                all_types = [
+                    feed
+                    for feed in self.feeds
+                    if feed.channel == ctx.channel and feed.username == username
+                ]
+
+                select = create_select(
+                    custom_id="_edit1",
+                    options=[
+                        create_select_option(
+                            label=(i if len(i) <= 25 else (i[:22] + "...")),
+                            description=", ".join(
+                                [Feed.get_type(i.type) for i in all_types]
+                            ),
+                            value=i,
+                            default=(username == i),
+                        )
+                        for i in list(set([item.username for item in items]))
+                    ],
+                    placeholder="Choose one of the feeds.",
+                    min_values=1,
+                    max_values=1,
+                )
+                actionrow = create_actionrow(select)
+
+                select_feed = create_select(
+                    custom_id="_activeSub0",
+                    options=[
+                        create_select_option(
+                            label=k.title(),
+                            value=str(v),
+                            default=v in [i.type for i in all_types],
+                        )
+                        for k, v in Feed.TYPE.items()
+                    ],
+                    placeholder="Choose the activities you want to track.",
+                    min_values=1,
+                    max_values=len(Feed.TYPE),
+                    disabled=False,
+                )
+                actionrow_feed = create_actionrow(select_feed)
+
+                await button_ctx.edit_origin(
+                    content="Active feeds in this channel",
+                    components=[actionrow, actionrow_feed],
+                )
+
+                try:
+                    button_ctx: ComponentContext = await wait_for_component(
+                        self.client,
+                        components=[actionrow_feed],
+                        check=check_author,
+                        timeout=15,
+                    )
+
+                    selected: List[int] = [int(i) for i in button_ctx.selected_options]
+                    await button_ctx.defer(edit_origin=True)
+
+                    select = create_select(
+                        custom_id="_edit1",
+                        options=[
+                            create_select_option(
+                                label=(i if len(i) <= 25 else (i[:22] + "...")),
+                                description=", ".join(
+                                    [Feed.get_type(i.type) for i in all_types]
+                                ),
+                                value=i,
+                                default=(username == i),
+                            )
+                            for i in list(set([item.username for item in items]))
+                        ],
+                        placeholder="Choose one of the feeds.",
+                        min_values=1,
+                        max_values=1,
+                        disabled=False,
+                    )
+                    actionrow = create_actionrow(select)
+
+                    select_feed = create_select(
+                        custom_id="_editSub1",
+                        options=[
+                            create_select_option(
+                                label=k.title(),
+                                value=str(v),
+                                default=v in selected,
+                            )
+                            for k, v in Feed.TYPE.items()
+                        ],
+                        placeholder="Choose the activities you want to track.",
+                        min_values=1,
+                        max_values=len(Feed.TYPE),
+                        disabled=True,
+                    )
+                    actionrow_feed = create_actionrow(select_feed)
+                    await message.edit(
+                        content=f"Active feeds in this channel",
+                        components=[actionrow, actionrow_feed],
+                    )
+                except:
+                    select = create_select(
+                        custom_id="_edit1",
+                        options=[
+                            create_select_option(
+                                label=(i if len(i) <= 25 else (i[:22] + "...")),
+                                description=", ".join(
+                                    [Feed.get_type(i.type) for i in all_types]
+                                ),
+                                value=i,
+                                default=(username == i),
+                            )
+                            for i in list(set([item.username for item in items]))
+                        ],
+                        placeholder="Choose one of the feeds.",
+                        min_values=1,
+                        max_values=1,
+                        disabled=True,
+                    )
+                    actionrow = create_actionrow(select)
+
+                    select_feed = create_select(
+                        custom_id="_editSub1",
+                        options=[
+                            create_select_option(
+                                label=k.title(),
+                                value=str(v),
+                                default=v in selected,
+                            )
+                            for k, v in Feed.TYPE.items()
+                        ],
+                        placeholder="Choose the activities you want to track.",
+                        min_values=1,
+                        max_values=len(Feed.TYPE),
+                        disabled=True,
+                    )
+                    actionrow_feed = create_actionrow(select_feed)
+                    await message.edit(
+                        content=f"Active feeds in this channel",
+                        components=[actionrow, actionrow_feed],
+                    )
+                    return
+
+                activities = []
+                activities_failed = []
+
+                try:
+                    profile = await anilist.get_user(name=username)
+                    profile = CUser.create(profile)
+                except:
+                    embed = discord.Embed(
+                        title="Could not start tracking!",
+                        description=(
+                            "There has been an error fetching this profile.\n"
+                            "Please double-check the username or try again later."
+                        ),
+                        color=color_errr,
+                    )
+                    await button_ctx.send("_ _឵឵", embed=embed, hidden=True)
+                    return
+
+                for i in selected:
+                    user: Activity = await Activity.create(
+                        username, ctx.channel, i, profile
+                    )
+
+                    if not user:
+                        activities_failed.append(
+                            f"`{list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].title()}`"
+                        )
+                        continue
+
+                    if user not in [
+                        i
+                        for i in self.feeds
+                        if i.type == user.type and i.channel == user.channel
+                    ]:
+                        self.feeds.append(user)
+                        await database.feed_insert([user.JSON()])
+                        activities.append(
+                            f"`Started {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].lower()}`"
+                        )
+                for i in [
+                    x
+                    for x in self.feeds
+                    if x.username == username and x.type not in selected
+                ]:
+                    self.feeds.remove(i)
+                    await database.feed_remove([i.JSON()])
+                    activities.append(
+                        f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
+                    )
+
+                embed = discord.Embed(
+                    title="Done!",
+                    description=f"This channel will now track the following activities of {username}",
+                    color=color_done if len(activities_failed) == 0 else color_warn,
+                )
+                if len(activities) >= 1:
+                    embed.add_field(name="Tracking", value="\n".join(activities))
+                if len(activities_failed) >= 1:
+                    embed.add_field(
+                        name="Could Not Start Tracking",
+                        value="\n".join(activities_failed),
+                    )
+
+                await user.get_feed(user.feed)
+                await user.feed.process_entries(
+                    user.feed.type.send_embed,
+                    channel=user.channel,
+                    profile=user.profile,
+                )
+
+            except:
+                await message.delete()
+                break
+
+        return
 
     @cog_ext.cog_slash(
         name="active",
@@ -567,12 +777,12 @@ class Controller(commands.Cog):
             if scope == SCOPE["This channel"]:
                 return (
                     feed.username
-                    + f" ({list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].title()})"
+                    + f" ({list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(feed.type)].title()})"
                 )
             elif scope == SCOPE["Whole server"]:
                 return (
                     feed.username
-                    + f" ({list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(type)].title()})"
+                    + f" ({list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(feed.type)].title()})"
                     + " -> #"
                     + feed.channel.name
                 )
@@ -616,11 +826,154 @@ class Controller(commands.Cog):
                 description=ex,
                 color=color_errr,
             )
-            await ctx.send(" ឵឵", embed=embed, hidden=True)
+            await ctx.send("_ _឵឵", embed=embed, hidden=True)
             return
 
         embed = await profile.send_embed()
-        await ctx.send(" ឵឵", embed=embed, hidden=send_message)
+        await ctx.send("_ _", embed=embed, hidden=send_message)
+
+    @cog_ext.cog_slash(
+        name="search",
+        description="Search for media.",
+        guild_ids=get_debug_guild_id(),
+        options=[
+            create_option(
+                name="media",
+                description="Media type to search.",
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+                choices=[
+                    create_choice(name="Anime", value="anime"),
+                    create_choice(name="Manga", value="manga"),
+                ],
+            ),
+            create_option(
+                name="query",
+                description="Search query.",
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+        ],
+    )
+    async def _search(self, ctx: SlashContext, media: str, query: str) -> CAnime:
+        results: List[Union[CAnime, CManga]] = await anilist.search(
+            query, content_type=media, page=1, limit=5
+        )
+        select = create_select(
+            custom_id="_search0",
+            options=[
+                create_select_option(
+                    label=(
+                        i.title.romaji
+                        if len(i.title.romaji) <= 25
+                        else i.title.romaji[:22] + "..."
+                    ),
+                    description=(
+                        (
+                            i.title.english
+                            if len(i.title.english) <= 50
+                            else i.title.english[:47] + "..."
+                        )
+                        if hasattr(i.title, "english")
+                        else (
+                            i.title.native
+                            if len(i.title.native) <= 50
+                            else i.title.native[:47] + "..."
+                        )
+                    ),
+                    value=str(i.id),
+                )
+                for i in results
+            ],
+            placeholder="Choose one of the results",
+            min_values=1,
+            max_values=1,
+        )
+        actionrow = create_actionrow(select)
+
+        message = await ctx.send(
+            content="Here are your search results!", components=[actionrow]
+        )
+
+        def check_author(cctx: ComponentContext):
+            return ctx.author.id == cctx.author.id
+
+        while True:
+            try:
+                button_ctx: ComponentContext = await wait_for_component(
+                    self.client, components=actionrow, check=check_author, timeout=30
+                )
+
+                selected: int = int(button_ctx.selected_options[0])
+                selected = await anilist.get(id=selected, content_type=media)
+
+                if media == "anime":
+                    selected: CAnime = CAnime.create(selected)
+                elif media == "manga":
+                    selected: CManga = CManga.create(selected)
+
+                embed = await selected.send_embed()
+
+                select = create_select(
+                    custom_id="_search1",
+                    options=[
+                        create_select_option(
+                            label=(
+                                i.title.romaji
+                                if len(i.title.romaji) <= 25
+                                else i.title.romaji[:22] + "..."
+                            ),
+                            description=(
+                                (
+                                    i.title.english
+                                    if len(i.title.english) <= 50
+                                    else i.title.english[:47] + "..."
+                                )
+                                if hasattr(i.title, "english")
+                                else (
+                                    i.title.native
+                                    if len(i.title.native) <= 50
+                                    else i.title.native[:47] + "..."
+                                )
+                            ),
+                            value=str(i.id),
+                            default=(str(i.id) == str(selected.id)),
+                        )
+                        for i in results
+                    ],
+                    placeholder="Choose one of the results",
+                    min_values=1,
+                    max_values=1,
+                )
+                actionrow = create_actionrow(select)
+
+                await button_ctx.edit_origin(
+                    content="Here are your search results!",
+                    components=[actionrow],
+                    embed=embed,
+                )
+
+            except:
+                select = create_select(
+                    custom_id="_search2",
+                    options=[
+                        create_select_option(
+                            label="Expired", description="Expired", value="-1"
+                        )
+                    ],
+                    placeholder="Choose one of the results (Expired)",
+                    min_values=1,
+                    max_values=1,
+                    disabled=True,
+                )
+                actionrow = create_actionrow(select)
+                await message.edit(
+                    content="_ _",
+                    components=[actionrow],
+                )
+                break
+
+        return
 
 
 def setup(client):
