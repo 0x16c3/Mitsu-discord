@@ -48,6 +48,12 @@ color_errr = discord.Color(0xFF0000)
 """
 
 
+def str_size(t, s: int = 100) -> str:
+    if len(t) > s:
+        return t[:s] + "..."
+    return t
+
+
 def date_format(time) -> str:
 
     if "+" in time:

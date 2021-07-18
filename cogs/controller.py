@@ -611,9 +611,9 @@ class Controller(commands.Cog):
         ],
     )
     async def _get_profile(
-        self, ctx: SlashContext, username: str, send_message: bool = False
+        self, ctx: SlashContext, username: str, **kwargs
     ):
-        send_message = not send_message
+        send_message = not kwargs["send-message"]
         await ctx.defer(hidden=send_message)
 
         try:

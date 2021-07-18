@@ -227,7 +227,7 @@ class CUser(User):
         embed = discord.Embed(
             title=f"{self.name}'s Profile",
             url=self.url,
-            description=strip_tags(self.about)
+            description=str_size(strip_tags(self.about))
             if hasattr(self, "about")
             else "No biography yet.",
             color=color,
