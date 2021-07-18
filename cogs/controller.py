@@ -221,10 +221,14 @@ class Activity:
         return items, items_full
 
     def __repr__(self):
-        return "<Activity: {}:{}>".format(self.username, str(self.channel.id))
+        return "<Activity: {}:{}:{}>".format(
+            self.username, str(self.channel.id), str(self.type)
+        )
 
     def __eq__(self, o: "Activity"):
-        return "<Activity: {}:{}>".format(self.username, str(self.channel.id)) == str(o)
+        return "<Activity: {}:{}:{}>".format(
+            self.username, str(self.channel.id), str(self.type)
+        ) == str(o)
 
     def JSON(self):
         return json.loads(
@@ -610,9 +614,7 @@ class Controller(commands.Cog):
             ),
         ],
     )
-    async def _get_profile(
-        self, ctx: SlashContext, username: str, **kwargs
-    ):
+    async def _get_profile(self, ctx: SlashContext, username: str, **kwargs):
         if not "send-message" in kwargs:
             kwargs["send-message"] = False
 
