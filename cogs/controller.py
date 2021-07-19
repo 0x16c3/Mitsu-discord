@@ -90,7 +90,7 @@ class Feed:
 
         if not self._init:
             if not len(feed):
-                logger.info("Could not initialize " + str(self))
+                logger.debug("Could not initialize " + str(self))
                 return
 
             for item in feed:
@@ -296,7 +296,7 @@ class Controller(commands.Cog):
 
     @cog_ext.cog_slash(
         name="activity",
-        description="Manage activity feed in current channel.",
+        description="Setup / manage an activity feed in the current channel.",
         guild_ids=get_debug_guild_id(),
         options=[
             create_option(
@@ -347,130 +347,126 @@ class Controller(commands.Cog):
 
         selected = []
 
-        try:
-            button_ctx: ComponentContext = await wait_for_component(
-                self.client, components=[actionrow], check=check_author, timeout=15
-            )
+        while True:
 
-            selected: List[int] = [int(i) for i in button_ctx.selected_options]
-            await button_ctx.defer(edit_origin=True)
-
-            select = create_select(
-                custom_id="_activity1",
-                options=[
-                    create_select_option(
-                        label=k.title(),
-                        value=str(v),
-                        default=v in selected,
-                    )
-                    for k, v in Feed.TYPE.items()
-                ],
-                placeholder="Choose the activities you want to track.",
-                min_values=0,
-                max_values=len(Feed.TYPE),
-                disabled=True,
-            )
-            actionrow = create_actionrow(select)
-            await message.edit(
-                content="Setting up activity feed",
-                components=[actionrow],
-            )
-        except:
-            select = create_select(
-                custom_id="_activity1",
-                options=[
-                    create_select_option(
-                        label=k.title(),
-                        value=str(v),
-                        default=v in selected,
-                    )
-                    for k, v in Feed.TYPE.items()
-                ],
-                placeholder="Choose the activities you want to track.",
-                min_values=0,
-                max_values=len(Feed.TYPE),
-                disabled=True,
-            )
-            actionrow = create_actionrow(select)
-            await message.edit(
-                content="Setting up activity feed",
-                components=[actionrow],
-            )
-            return
-
-        activities = []
-        activities_failed = []
-
-        try:
-            profile = await anilist.get_user(name=username)
-            profile = CUser.create(profile)
-        except:
-            embed = discord.Embed(
-                title="Could not start tracking!",
-                description=(
-                    "There has been an error fetching this profile.\n"
-                    "Please double-check the username or try again later."
-                ),
-                color=color_errr,
-            )
-            await button_ctx.edit_origin("_ _឵឵", embed=embed)
-            return
-
-        user = None
-
-        for i in selected:
-            user: Activity = await Activity.create(username, ctx.channel, i, profile)
-
-            if not user:
-                activities_failed.append(
-                    f"`{list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].title()}`"
+            try:
+                button_ctx: ComponentContext = await wait_for_component(
+                    self.client, components=[actionrow], check=check_author, timeout=15
                 )
-                continue
 
-            if user not in [
-                i
-                for i in self.feeds
-                if i.type == user.type and i.channel == user.channel
+                selected: List[int] = [int(i) for i in button_ctx.selected_options]
+                await button_ctx.defer(edit_origin=True)
+
+                select = create_select(
+                    custom_id="_activity1",
+                    options=[
+                        create_select_option(
+                            label=k.title(),
+                            value=str(v),
+                            default=v in selected,
+                        )
+                        for k, v in Feed.TYPE.items()
+                    ],
+                    placeholder="Choose the activities you want to track.",
+                    min_values=0,
+                    max_values=len(Feed.TYPE),
+                    disabled=False,
+                )
+                actionrow = create_actionrow(select)
+                await message.edit(
+                    content="Setting up activity feed",
+                    components=[actionrow],
+                )
+            except:
+                select = create_select(
+                    custom_id="_activity1",
+                    options=[
+                        create_select_option(
+                            label=k.title(),
+                            value=str(v),
+                            default=v in selected,
+                        )
+                        for k, v in Feed.TYPE.items()
+                    ],
+                    placeholder="Choose the activities you want to track.",
+                    min_values=0,
+                    max_values=len(Feed.TYPE),
+                    disabled=True,
+                )
+                actionrow = create_actionrow(select)
+                await message.edit(
+                    content="Setting up activity feed",
+                    components=[actionrow],
+                )
+                return
+
+            activities = []
+            activities_failed = []
+
+            try:
+                profile = await anilist.get_user(name=username)
+                profile = CUser.create(profile)
+            except:
+                embed = discord.Embed(
+                    title="Could not start tracking!",
+                    description=(
+                        "There has been an error fetching this profile.\n"
+                        "Please double-check the username or try again later."
+                    ),
+                    color=color_errr,
+                )
+                await button_ctx.edit_origin("An error occured!", embed=embed)
+                return
+
+            user = None
+
+            for i in selected:
+                user: Activity = await Activity.create(
+                    username, ctx.channel, i, profile
+                )
+
+                if not user:
+                    activities_failed.append(
+                        f"`{list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].title()}`"
+                    )
+                    continue
+
+                if user not in [
+                    i
+                    for i in self.feeds
+                    if i.type == user.type and i.channel == user.channel
+                ]:
+                    self.feeds.append(user)
+                    await database.feed_insert([user.JSON()])
+                    activities.append(
+                        f"`Started {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].lower()}`"
+                    )
+            for i in [
+                x
+                for x in self.feeds
+                if x.username == username
+                and x.channel == ctx.channel
+                and x.type not in selected
             ]:
-                self.feeds.append(user)
-                await database.feed_insert([user.JSON()])
+                self.feeds.remove(i)
+                await database.feed_remove([i.JSON()])
                 activities.append(
-                    f"`Started {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].lower()}`"
+                    f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
                 )
-        for i in [
-            x
-            for x in self.feeds
-            if x.username == username
-            and x.channel == ctx.channel
-            and x.type not in selected
-        ]:
-            self.feeds.remove(i)
-            await database.feed_remove([i.JSON()])
-            activities.append(
-                f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
-            )
 
-        embed = discord.Embed(
-            title="Done!",
-            description=f"This channel will now track the following activities of {username}",
-            color=color_done if len(activities_failed) == 0 else color_warn,
-        )
-        if len(activities) >= 1:
-            embed.add_field(name="Tracking", value="\n".join(activities))
-        if len(activities_failed) >= 1:
-            embed.add_field(
-                name="Could Not Start Tracking", value="\n".join(activities_failed)
+            embed = discord.Embed(
+                title="Done!",
+                description=f"This channel will now track the following activities of {username}",
+                color=color_done if len(activities_failed) == 0 else color_warn,
             )
+            if len(activities) >= 1:
+                embed.add_field(name="Tracking", value="\n".join(activities))
+            if len(activities_failed) >= 1:
+                embed.add_field(
+                    name="Could Not Start Tracking", value="\n".join(activities_failed)
+                )
 
-        if user:
-            await user.get_feed(user.feed)
-            await user.feed.process_entries(
-                user.feed.type.send_embed,
-                channel=user.channel,
-                profile=user.profile,
-            )
-
-        await message.edit(content="_ _", embed=embed, hidden=True)
+            await message.edit(content="Done!", embed=embed, hidden=True)
 
     @cog_ext.cog_slash(
         name="edit",
@@ -578,171 +574,173 @@ class Controller(commands.Cog):
 
                 selected = []
 
-                try:
-                    button_ctx: ComponentContext = await wait_for_component(
-                        self.client,
-                        components=[actionrow_feed],
-                        check=check_author,
-                        timeout=15,
-                    )
+                while True:
 
-                    selected: List[int] = [int(i) for i in button_ctx.selected_options]
-                    await button_ctx.defer(edit_origin=True)
-
-                    select = create_select(
-                        custom_id="_edit1",
-                        options=[
-                            create_select_option(
-                                label=(i if len(i) <= 25 else (i[:22] + "...")),
-                                description=", ".join(
-                                    [Feed.get_type(i.type) for i in all_types]
-                                ),
-                                value=i,
-                                default=(username == i),
-                            )
-                            for i in list(set([item.username for item in items]))
-                        ],
-                        placeholder="Choose one of the feeds.",
-                        min_values=1,
-                        max_values=1,
-                        disabled=False,
-                    )
-                    actionrow = create_actionrow(select)
-
-                    select_feed = create_select(
-                        custom_id="_editSub1",
-                        options=[
-                            create_select_option(
-                                label=k.title(),
-                                value=str(v),
-                                default=v in selected,
-                            )
-                            for k, v in Feed.TYPE.items()
-                        ],
-                        placeholder="Choose the activities you want to track.",
-                        min_values=0,
-                        max_values=len(Feed.TYPE),
-                        disabled=True,
-                    )
-                    actionrow_feed = create_actionrow(select_feed)
-                    await message.edit(
-                        content=f"Active feeds in this channel",
-                        components=[actionrow, actionrow_feed],
-                    )
-                except:
-                    select = create_select(
-                        custom_id="_edit1",
-                        options=[
-                            create_select_option(
-                                label=(i if len(i) <= 25 else (i[:22] + "...")),
-                                description=", ".join(
-                                    [Feed.get_type(i.type) for i in all_types]
-                                ),
-                                value=i,
-                                default=(username == i),
-                            )
-                            for i in list(set([item.username for item in items]))
-                        ],
-                        placeholder="Choose one of the feeds.",
-                        min_values=1,
-                        max_values=1,
-                        disabled=True,
-                    )
-                    actionrow = create_actionrow(select)
-
-                    select_feed = create_select(
-                        custom_id="_editSub1",
-                        options=[
-                            create_select_option(
-                                label=k.title(),
-                                value=str(v),
-                                default=v in selected,
-                            )
-                            for k, v in Feed.TYPE.items()
-                        ],
-                        placeholder="Choose the activities you want to track.",
-                        min_values=0,
-                        max_values=len(Feed.TYPE),
-                        disabled=True,
-                    )
-                    actionrow_feed = create_actionrow(select_feed)
-                    await message.edit(
-                        content=f"Active feeds in this channel",
-                        components=[actionrow, actionrow_feed],
-                    )
-                    return
-
-                activities = []
-                activities_failed = []
-
-                try:
-                    profile = await anilist.get_user(name=username)
-                    profile = CUser.create(profile)
-                except:
-                    embed = discord.Embed(
-                        title="Could not start tracking!",
-                        description=(
-                            "There has been an error fetching this profile.\n"
-                            "Please double-check the username or try again later."
-                        ),
-                        color=color_errr,
-                    )
-                    await button_ctx.edit_origin("_ _឵឵", embed=embed)
-                    return
-
-                user = None 
-
-                for i in selected:
-                    user: Activity = await Activity.create(
-                        username, ctx.channel, i, profile
-                    )
-
-                    if not user:
-                        activities_failed.append(
-                            f"`{list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].title()}`"
+                    try:
+                        button_ctx: ComponentContext = await wait_for_component(
+                            self.client,
+                            components=[actionrow_feed],
+                            check=check_author,
+                            timeout=15,
                         )
-                        continue
 
-                    if user not in [
-                        i
-                        for i in self.feeds
-                        if i.type == user.type and i.channel == user.channel
+                        selected: List[int] = [
+                            int(i) for i in button_ctx.selected_options
+                        ]
+                        await button_ctx.defer(edit_origin=True)
+
+                        select = create_select(
+                            custom_id="_edit1",
+                            options=[
+                                create_select_option(
+                                    label=(i if len(i) <= 25 else (i[:22] + "...")),
+                                    description=", ".join(
+                                        [Feed.get_type(i.type) for i in all_types]
+                                    ),
+                                    value=i,
+                                    default=(username == i),
+                                )
+                                for i in list(set([item.username for item in items]))
+                            ],
+                            placeholder="Choose one of the feeds.",
+                            min_values=1,
+                            max_values=1,
+                            disabled=False,
+                        )
+                        actionrow = create_actionrow(select)
+
+                        select_feed = create_select(
+                            custom_id="_editSub1",
+                            options=[
+                                create_select_option(
+                                    label=k.title(),
+                                    value=str(v),
+                                    default=v in selected,
+                                )
+                                for k, v in Feed.TYPE.items()
+                            ],
+                            placeholder="Choose the activities you want to track.",
+                            min_values=0,
+                            max_values=len(Feed.TYPE),
+                            disabled=False,
+                        )
+                        actionrow_feed = create_actionrow(select_feed)
+                        await message.edit(
+                            content=f"Active feeds in this channel",
+                            components=[actionrow, actionrow_feed],
+                        )
+                    except:
+                        select = create_select(
+                            custom_id="_edit1",
+                            options=[
+                                create_select_option(
+                                    label=(i if len(i) <= 25 else (i[:22] + "...")),
+                                    description=", ".join(
+                                        [Feed.get_type(i.type) for i in all_types]
+                                    ),
+                                    value=i,
+                                    default=(username == i),
+                                )
+                                for i in list(set([item.username for item in items]))
+                            ],
+                            placeholder="Choose one of the feeds.",
+                            min_values=1,
+                            max_values=1,
+                            disabled=True,
+                        )
+                        actionrow = create_actionrow(select)
+
+                        select_feed = create_select(
+                            custom_id="_editSub1",
+                            options=[
+                                create_select_option(
+                                    label=k.title(),
+                                    value=str(v),
+                                    default=v in selected,
+                                )
+                                for k, v in Feed.TYPE.items()
+                            ],
+                            placeholder="Choose the activities you want to track.",
+                            min_values=0,
+                            max_values=len(Feed.TYPE),
+                            disabled=True,
+                        )
+                        actionrow_feed = create_actionrow(select_feed)
+                        await message.edit(
+                            content=f"Active feeds in this channel",
+                            components=[actionrow, actionrow_feed],
+                        )
+                        return
+
+                    activities = []
+                    activities_failed = []
+
+                    try:
+                        profile = await anilist.get_user(name=username)
+                        profile = CUser.create(profile)
+                    except:
+                        embed = discord.Embed(
+                            title="Could not start tracking!",
+                            description=(
+                                "There has been an error fetching this profile.\n"
+                                "Please double-check the username or try again later."
+                            ),
+                            color=color_errr,
+                        )
+                        await button_ctx.edit_origin("An error occured!", embed=embed)
+                        return
+
+                    user = None
+
+                    for i in selected:
+                        user: Activity = await Activity.create(
+                            username, ctx.channel, i, profile
+                        )
+
+                        if not user:
+                            activities_failed.append(
+                                f"`{list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].title()}`"
+                            )
+                            continue
+
+                        if user not in [
+                            i
+                            for i in self.feeds
+                            if i.type == user.type and i.channel == user.channel
+                        ]:
+                            self.feeds.append(user)
+                            await database.feed_insert([user.JSON()])
+                            activities.append(
+                                f"`Started {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].lower()}`"
+                            )
+                    for i in [
+                        x
+                        for x in self.feeds
+                        if x.username == username and x.type not in selected
                     ]:
-                        self.feeds.append(user)
-                        await database.feed_insert([user.JSON()])
+                        self.feeds.remove(i)
+                        await database.feed_remove([i.JSON()])
                         activities.append(
-                            f"`Started {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].lower()}`"
+                            f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
                         )
-                for i in [
-                    x
-                    for x in self.feeds
-                    if x.username == username and x.type not in selected
-                ]:
-                    self.feeds.remove(i)
-                    await database.feed_remove([i.JSON()])
-                    activities.append(
-                        f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
-                    )
 
-                embed = discord.Embed(
-                    title="Done!",
-                    description=f"This channel will now track the following activities of {username}",
-                    color=color_done if len(activities_failed) == 0 else color_warn,
-                )
-                if len(activities) >= 1:
-                    embed.add_field(name="Tracking", value="\n".join(activities))
-                if len(activities_failed) >= 1:
-                    embed.add_field(
-                        name="Could Not Start Tracking",
-                        value="\n".join(activities_failed),
+                    embed = discord.Embed(
+                        title="Done!",
+                        description=f"This channel will now track the following activities of {username}",
+                        color=color_done if len(activities_failed) == 0 else color_warn,
                     )
+                    if len(activities) >= 1:
+                        embed.add_field(name="Tracking", value="\n".join(activities))
+                    if len(activities_failed) >= 1:
+                        embed.add_field(
+                            name="Could Not Start Tracking",
+                            value="\n".join(activities_failed),
+                        )
 
-                if user:
-                    await user.get_feed(user.feed)
-                    await user.feed.process_entries(
-                        user.feed.type.send_embed,
-                        channel=user.channel,
-                        profile=user.profile,
+                    await button_ctx.edit_origin(
+                        content=f"Active feeds in this channel",
+                        components=[actionrow, actionrow_feed],
+                        embed=embed,
                     )
 
             except:
@@ -841,11 +839,11 @@ class Controller(commands.Cog):
                 description=ex,
                 color=color_errr,
             )
-            await ctx.send("_ _឵឵", embed=embed, hidden=True)
+            await ctx.send("An error occured!", embed=embed, hidden=True)
             return
 
         embed = await profile.send_embed()
-        await ctx.send("_ _", embed=embed, hidden=send_message)
+        await ctx.send("An error occured!", embed=embed, hidden=send_message)
 
     @cog_ext.cog_slash(
         name="search",
@@ -907,7 +905,7 @@ class Controller(commands.Cog):
         actionrow = create_actionrow(select)
 
         message = await ctx.send(
-            content="Here are your search results!", components=[actionrow]
+            content=f"Search results for {query}", components=[actionrow]
         )
 
         def check_author(cctx: ComponentContext):
@@ -963,7 +961,7 @@ class Controller(commands.Cog):
                 actionrow = create_actionrow(select)
 
                 await button_ctx.edit_origin(
-                    content="Here are your search results!",
+                    content=f"Search results for {query}",
                     components=[actionrow],
                     embed=embed,
                 )
@@ -983,7 +981,7 @@ class Controller(commands.Cog):
                 )
                 actionrow = create_actionrow(select)
                 await message.edit(
-                    content="_ _",
+                    content="Done!",
                     components=[actionrow],
                 )
                 break
