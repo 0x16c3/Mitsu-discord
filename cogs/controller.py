@@ -492,6 +492,7 @@ class Controller(commands.Cog):
                 f"No active feeds in this channel",
                 hidden=True,
             )
+            return
 
         select = create_select(
             custom_id="_edit0",
