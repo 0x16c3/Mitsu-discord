@@ -1,4 +1,5 @@
 # discord imports
+from os import terminal_size
 import discord
 from discord.ext import commands
 import asyncio
@@ -17,7 +18,7 @@ from discord_slash.utils.manage_components import (
 # utilities
 from .utils import *
 from .api.database import database
-from .api.types import CUser, CAnime, CManga, CListActivity, CTextActivity
+from .api.types import CCharacter, CUser, CAnime, CManga, CListActivity, CTextActivity
 from typing import Union
 
 
@@ -859,6 +860,7 @@ class Controller(commands.Cog):
                 choices=[
                     create_choice(name="Anime", value="anime"),
                     create_choice(name="Manga", value="manga"),
+                    create_choice(name="Character", value="character"),
                 ],
             ),
             create_option(
@@ -878,22 +880,34 @@ class Controller(commands.Cog):
             options=[
                 create_select_option(
                     label=(
-                        i.title.romaji
-                        if len(i.title.romaji) <= 25
-                        else i.title.romaji[:22] + "..."
+                        (
+                            i.title.romaji
+                            if len(i.title.romaji) <= 25
+                            else i.title.romaji[:22] + "..."
+                        )
+                        if media != "character"
+                        else (
+                            i.name.full
+                            if len(i.name.full) <= 25
+                            else i.name.full[:22] + "..."
+                        )
                     ),
                     description=(
                         (
-                            i.title.english
-                            if len(i.title.english) <= 50
-                            else i.title.english[:47] + "..."
+                            (
+                                i.title.english
+                                if len(i.title.english) <= 50
+                                else i.title.english[:47] + "..."
+                            )
+                            if hasattr(i.title, "english")
+                            else (
+                                i.title.native
+                                if len(i.title.native) <= 50
+                                else i.title.native[:47] + "..."
+                            )
                         )
-                        if hasattr(i.title, "english")
-                        else (
-                            i.title.native
-                            if len(i.title.native) <= 50
-                            else i.title.native[:47] + "..."
-                        )
+                        if media != "character"
+                        else None
                     ),
                     value=str(i.id),
                 )
@@ -925,30 +939,45 @@ class Controller(commands.Cog):
                     selected: CAnime = CAnime.create(selected)
                 elif media == "manga":
                     selected: CManga = CManga.create(selected)
+                elif media == "character":
+                    selected: CCharacter = CCharacter.create(selected)
 
-                embed = await selected.send_embed()
+                enable_filter = not ctx.channel.is_nsfw()
+                embed = await selected.send_embed(filter_adult=enable_filter)
 
                 select = create_select(
                     custom_id="_search1",
                     options=[
                         create_select_option(
                             label=(
-                                i.title.romaji
-                                if len(i.title.romaji) <= 25
-                                else i.title.romaji[:22] + "..."
+                                (
+                                    i.title.romaji
+                                    if len(i.title.romaji) <= 25
+                                    else i.title.romaji[:22] + "..."
+                                )
+                                if media != "character"
+                                else (
+                                    i.name.full
+                                    if len(i.name.full) <= 25
+                                    else i.name.full[:22] + "..."
+                                )
                             ),
                             description=(
                                 (
-                                    i.title.english
-                                    if len(i.title.english) <= 50
-                                    else i.title.english[:47] + "..."
+                                    (
+                                        i.title.english
+                                        if len(i.title.english) <= 50
+                                        else i.title.english[:47] + "..."
+                                    )
+                                    if hasattr(i.title, "english")
+                                    else (
+                                        i.title.native
+                                        if len(i.title.native) <= 50
+                                        else i.title.native[:47] + "..."
+                                    )
                                 )
-                                if hasattr(i.title, "english")
-                                else (
-                                    i.title.native
-                                    if len(i.title.native) <= 50
-                                    else i.title.native[:47] + "..."
-                                )
+                                if media != "character"
+                                else None
                             ),
                             value=str(i.id),
                             default=(str(i.id) == str(selected.id)),

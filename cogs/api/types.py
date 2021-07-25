@@ -36,8 +36,7 @@ class CAnime(Anime):
         return obj
 
     async def send_embed(
-        self,
-        channel: discord.TextChannel = None,
+        self, channel: discord.TextChannel = None, filter_adult: bool = True
     ) -> Optional[discord.Embed]:
         embed = discord.Embed(
             title=self.title.romaji,
@@ -95,7 +94,10 @@ class CAnime(Anime):
             ),
             inline=False,
         )
-        embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+        if self.is_adult and filter_adult:
+            embed.set_image(url=f"https://mitsu.0x16c3.com/filter/media/{self.id}")
+        else:
+            embed.set_image(url=f"https://img.anili.st/media/{self.id}")
 
         if channel:
             try:
@@ -112,8 +114,7 @@ class CManga(Manga):
         return obj
 
     async def send_embed(
-        self,
-        channel: discord.TextChannel = None,
+        self, channel: discord.TextChannel = None, filter_adult: bool = True
     ) -> Optional[discord.Embed]:
         embed = discord.Embed(
             title=self.title.romaji,
@@ -159,7 +160,38 @@ class CManga(Manga):
             ),
             inline=False,
         )
-        embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+        if self.is_adult and filter_adult:
+            embed.set_image(url=f"https://mitsu.0x16c3.com/filter/media/{self.id}")
+        else:
+            embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+
+        if channel:
+            try:
+                await channel.send(embed=embed)
+            except Exception as e:
+                logger.info(f"Cannot send message -> {str(channel.id)} : {self.id} {e}")
+        else:
+            return embed
+
+
+class CCharacter(Character):
+    def create(obj: Character) -> "CCharacter":
+        obj.__class__ = CCharacter
+        return obj
+
+    async def send_embed(
+        self, channel: discord.TextChannel = None, **kwargs
+    ) -> Optional[discord.Embed]:
+        embed = discord.Embed(
+            title=self.name.full,
+            url=self.url,
+            description=self.description
+            if hasattr(self, "description")
+            else "No description.",
+            color=color_main,
+        )
+
+        embed.set_image(url=f"https://mitsu.0x16c3.com/character/{self.id}")
 
         if channel:
             try:
