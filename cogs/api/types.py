@@ -94,7 +94,7 @@ class CAnime(Anime):
             ),
             inline=False,
         )
-        if self.is_adult and filter_adult:
+        if (hasattr(self, "is_adult") and self.is_adult) and filter_adult:
             embed.set_image(url=f"https://mitsu.0x16c3.com/filter/media/{self.id}")
         else:
             embed.set_image(url=f"https://img.anili.st/media/{self.id}")
@@ -160,7 +160,7 @@ class CManga(Manga):
             ),
             inline=False,
         )
-        if self.is_adult and filter_adult:
+        if (hasattr(self, "is_adult") and self.is_adult) and filter_adult:
             embed.set_image(url=f"https://mitsu.0x16c3.com/filter/media/{self.id}")
         else:
             embed.set_image(url=f"https://img.anili.st/media/{self.id}")
@@ -186,7 +186,9 @@ class CCharacter(Character):
         description_formatted = None
         if hasattr(self, "description"):
             description_formatted = self.description.replace("~!", "||")
-            description_formatted = description_formatted[:512] + ("..." if len(description_formatted) > 512 else "")
+            description_formatted = description_formatted[:512] + (
+                "..." if len(description_formatted) > 512 else ""
+            )
 
         embed = discord.Embed(
             title=self.name.full,

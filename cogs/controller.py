@@ -845,7 +845,7 @@ class Controller(commands.Cog):
             return
 
         embed = await profile.send_embed()
-        await ctx.send("An error occured!", embed=embed, hidden=send_message)
+        await ctx.send("Done!", embed=embed, hidden=send_message)
 
     @cog_ext.cog_slash(
         name="search",
