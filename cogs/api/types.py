@@ -347,7 +347,10 @@ class CListActivity(ListActivity):
 
     @staticmethod
     async def send_embed(
-        item: "CListActivity", anilist: AsyncClient, channel: discord.TextChannel = None
+        item: "CListActivity",
+        anilist: AsyncClient,
+        channel: discord.TextChannel = None,
+        filter_adult: bool = True,
     ) -> Optional[discord.Embed]:
 
         user, listitem = await item.get_list(anilist)
@@ -462,9 +465,24 @@ class CListActivity(ListActivity):
                 value=stat_embed.fields[0].value,
                 inline=False,
             )
-            embed.set_image(url=f"https://img.anili.st/media/{item.media.id}")
+
+            if (
+                hasattr(item.media, "is_adult") and item.media.is_adult
+            ) and filter_adult:
+                embed.set_image(
+                    url=f"https://mitsu.0x16c3.com/filter/media/{item.media.id}"
+                )
+            else:
+                embed.set_image(url=f"https://img.anili.st/media/{item.media.id}")
         else:
-            embed.set_thumbnail(url=item.media.cover.large)
+            if (
+                hasattr(item.media, "is_adult") and item.media.is_adult
+            ) and filter_adult:
+                embed.set_thumbnail(
+                    url=f"https://mitsu.0x16c3.com/filter/cover/{'MANGA' if is_manga else 'ANIME'}-{str(item.media.id)}"
+                )
+            else:
+                embed.set_thumbnail(url=item.media.cover.large)
 
         embed.set_footer(
             text=f"{'Manga' if is_manga else 'Anime'} list of {item.username}",

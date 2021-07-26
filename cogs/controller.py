@@ -270,11 +270,14 @@ class Controller(commands.Cog):
         for user in self.feeds:
             user: Activity
 
+            enable_filter = not user.channel.is_nsfw()
+
             await user.get_feed(user.feed)
             await user.feed.process_entries(
                 user.feed.type.send_embed,
                 channel=user.channel,
                 anilist=anilist,
+                filter_adult=enable_filter,
             )
 
         logger.info(f"Loaded {len(self.feeds)}.")
@@ -288,11 +291,14 @@ class Controller(commands.Cog):
             for user in self.feeds:
                 user: Activity
 
+                enable_filter = not user.channel.is_nsfw()
+
                 await user.get_feed(user.feed)
                 await user.feed.process_entries(
                     user.feed.type.send_embed,
                     channel=user.channel,
                     anilist=anilist,
+                    filter_adult=enable_filter,
                 )
 
     @cog_ext.cog_slash(
