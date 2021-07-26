@@ -182,12 +182,16 @@ class CCharacter(Character):
     async def send_embed(
         self, channel: discord.TextChannel = None, **kwargs
     ) -> Optional[discord.Embed]:
+
+        description_formatted = None
+        if hasattr(self, "description"):
+            description_formatted = self.description.replace("~!", "||")
+            description_formatted = description_formatted[:512] + ("..." if len(description_formatted) > 512 else "")
+
         embed = discord.Embed(
             title=self.name.full,
             url=self.url,
-            description=self.description
-            if hasattr(self, "description")
-            else "No description.",
+            description=description_formatted,
             color=color_main,
         )
 
