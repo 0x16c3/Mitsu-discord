@@ -185,7 +185,7 @@ class CCharacter(Character):
 
         description_formatted = None
         if hasattr(self, "description"):
-            description_formatted = self.description.replace("~!", "||")
+            description_formatted = self.description.replace("~!", "\n||")
             description_formatted = description_formatted.replace("!~", "||")
 
             description_formatted = description_formatted[:512] + (
@@ -193,7 +193,7 @@ class CCharacter(Character):
             )
 
             if description_formatted.count("||") % 2 != 0:
-                description_formatted = description_formatted[:-3] + "|| ..."
+                description_formatted = description_formatted[:-3] + "||..."
 
         embed = discord.Embed(
             title=self.name.full,
