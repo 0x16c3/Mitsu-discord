@@ -72,7 +72,7 @@ class CAnime(Anime):
                 )
                 + (
                     f"Premiered {self.season.name.title()} {self.season.year}\n"
-                    if hasattr(self, "season")
+                    if hasattr(self, "season") and hasattr(self.season, "name") and hasattr(self.season, "year")
                     else "Not Premiered Yet\n"
                 )
                 + (
@@ -326,6 +326,7 @@ class CListActivity(ListActivity):
     def get_score_color(user: CUser, score: int) -> Tuple[int, int, int]:
         amount = 5
         colors = user.get_color_list(amount)
+        colors.reverse()
 
         delta = 100 / amount
 
