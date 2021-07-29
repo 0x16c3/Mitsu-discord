@@ -36,8 +36,7 @@ class CAnime(Anime):
         return obj
 
     async def send_embed(
-        self,
-        channel: discord.TextChannel = None,
+        self, channel: discord.TextChannel = None, filter_adult: bool = True
     ) -> Optional[discord.Embed]:
         embed = discord.Embed(
             title=self.title.romaji,
@@ -73,7 +72,7 @@ class CAnime(Anime):
                 )
                 + (
                     f"Premiered {self.season.name.title()} {self.season.year}\n"
-                    if hasattr(self, "season")
+                    if hasattr(self, "season") and hasattr(self.season, "name") and hasattr(self.season, "year")
                     else "Not Premiered Yet\n"
                 )
                 + (
@@ -95,7 +94,10 @@ class CAnime(Anime):
             ),
             inline=False,
         )
-        embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+        if (hasattr(self, "is_adult") and self.is_adult) and filter_adult:
+            embed.set_image(url=f"https://mitsu.0x16c3.com/filter/media/{self.id}")
+        else:
+            embed.set_image(url=f"https://img.anili.st/media/{self.id}")
 
         if channel:
             try:
@@ -112,8 +114,7 @@ class CManga(Manga):
         return obj
 
     async def send_embed(
-        self,
-        channel: discord.TextChannel = None,
+        self, channel: discord.TextChannel = None, filter_adult: bool = True
     ) -> Optional[discord.Embed]:
         embed = discord.Embed(
             title=self.title.romaji,
@@ -159,7 +160,49 @@ class CManga(Manga):
             ),
             inline=False,
         )
-        embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+        if (hasattr(self, "is_adult") and self.is_adult) and filter_adult:
+            embed.set_image(url=f"https://mitsu.0x16c3.com/filter/media/{self.id}")
+        else:
+            embed.set_image(url=f"https://img.anili.st/media/{self.id}")
+
+        if channel:
+            try:
+                await channel.send(embed=embed)
+            except Exception as e:
+                logger.info(f"Cannot send message -> {str(channel.id)} : {self.id} {e}")
+        else:
+            return embed
+
+
+class CCharacter(Character):
+    def create(obj: Character) -> "CCharacter":
+        obj.__class__ = CCharacter
+        return obj
+
+    async def send_embed(
+        self, channel: discord.TextChannel = None, **kwargs
+    ) -> Optional[discord.Embed]:
+
+        description_formatted = None
+        if hasattr(self, "description"):
+            description_formatted = self.description.replace("~!", "\n||")
+            description_formatted = description_formatted.replace("!~", "||")
+
+            description_formatted = description_formatted[:512] + (
+                "..." if len(description_formatted) > 512 else ""
+            )
+
+            if description_formatted.count("||") % 2 != 0:
+                description_formatted = description_formatted[:-3] + "||..."
+
+        embed = discord.Embed(
+            title=self.name.full,
+            url=self.url,
+            description=description_formatted,
+            color=color_main,
+        )
+
+        embed.set_image(url=f"https://mitsu.0x16c3.com/character/{self.id}")
 
         if channel:
             try:
@@ -283,6 +326,7 @@ class CListActivity(ListActivity):
     def get_score_color(user: CUser, score: int) -> Tuple[int, int, int]:
         amount = 5
         colors = user.get_color_list(amount)
+        colors.reverse()
 
         delta = 100 / amount
 
@@ -309,7 +353,10 @@ class CListActivity(ListActivity):
 
     @staticmethod
     async def send_embed(
-        item: "CListActivity", anilist: AsyncClient, channel: discord.TextChannel = None
+        item: "CListActivity",
+        anilist: AsyncClient,
+        channel: discord.TextChannel = None,
+        filter_adult: bool = True,
     ) -> Optional[discord.Embed]:
 
         user, listitem = await item.get_list(anilist)
@@ -424,9 +471,24 @@ class CListActivity(ListActivity):
                 value=stat_embed.fields[0].value,
                 inline=False,
             )
-            embed.set_image(url=f"https://img.anili.st/media/{item.media.id}")
+
+            if (
+                hasattr(item.media, "is_adult") and item.media.is_adult
+            ) and filter_adult:
+                embed.set_image(
+                    url=f"https://mitsu.0x16c3.com/filter/media/{item.media.id}"
+                )
+            else:
+                embed.set_image(url=f"https://img.anili.st/media/{item.media.id}")
         else:
-            embed.set_thumbnail(url=item.media.cover.large)
+            if (
+                hasattr(item.media, "is_adult") and item.media.is_adult
+            ) and filter_adult:
+                embed.set_thumbnail(
+                    url=f"https://mitsu.0x16c3.com/filter/cover/{'MANGA' if is_manga else 'ANIME'}-{str(item.media.id)}"
+                )
+            else:
+                embed.set_thumbnail(url=item.media.cover.large)
 
         embed.set_footer(
             text=f"{'Manga' if is_manga else 'Anime'} list of {item.username}",
