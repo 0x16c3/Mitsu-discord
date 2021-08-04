@@ -23,6 +23,19 @@ from typing import Union
 
 
 class Feed:
+    """AniList feed object that interfaces with the AniList api.
+
+    Args:
+        username (str): Username of the profile
+        feed (int): Feed type
+
+    Attributes:
+        username (str): Username of the profile
+        feed (int): Feed type
+        function (method): Function to fetch new activities
+        arguments (dict): Arguments to pass to the function
+        type: Excpected activity object type
+    """
 
     TYPE = {"ANIME": 0, "MANGA": 1, "TEXT": 2}
 
@@ -70,11 +83,24 @@ class Feed:
         List[Union[CListActivity, CTextActivity]],
         List[Union[CListActivity, CTextActivity]],
     ]:
+        """Retrieves activity feed from AniList.
+
+        Returns:
+            List[Union[CListActivity, CTextActivity]],: First 15 activities.
+            List[Union[CListActivity, CTextActivity]]]: Entire activity list.
+        """
         try:
             ret = await self.function(**self.arguments)
 
-            if not ret:
-                return [], []
+            if not isinstance(ret, list):
+                ret = []
+
+            if self.feed == self.TYPE["TEXT"]:
+                msg = await anilist.get_activity(
+                    id=self.username, content_type="message"
+                )
+                if msg:
+                    ret.extend(msg)
 
             res = []
             for item in ret:
@@ -87,11 +113,17 @@ class Feed:
 
         return res[:15], res
 
-    async def update(self, feed: list, feed_full: list) -> None:
+    async def update(self, feed: list) -> None:
+        """Updates activity list.
+        Checks for new activities.
+
+        Args:
+            feed (list): Latest activity feed from AniList
+        """
 
         if not self._init:
             if not len(feed):
-                logger.debug("Could not initialize " + str(self))
+                logger.info("Initialized empty " + str(self))
                 return
 
             for item in feed:
@@ -117,6 +149,15 @@ class Feed:
             logger.info("Added " + str(item.id))
 
     async def move_item(self, item, func=None, **kwargs) -> bool:
+        """Runs function on item if provided and flags it as processed.
+
+        Args:
+            item: Activity item
+            func (method): Function to run. Defaults to None.
+
+        Returns:
+            bool: if the item is moved or not
+        """
 
         processed = False
 
@@ -142,6 +183,11 @@ class Feed:
         return processed
 
     async def process_entries(self, func, **kwargs) -> None:
+        """Processes current list of entries.
+
+        Args:
+            func (method): Function to run on processed items
+        """
 
         logger.debug(str(self) + ".entries:" + str(len(self.entries)))
         logger.debug(
@@ -165,9 +211,9 @@ class Feed:
             items, items_full = await self.retrieve()
             if len(items) == 0:
                 logger.info("Could not reset " + str(self) + " - FALLBACK (NEXT TICK)")
-                return []
+                return
 
-            await self.update(items, items_full)
+            await self.update(items)
 
             logger.info("Reset " + str(self) + " - exceeded entry limit.")
             return
@@ -176,6 +222,23 @@ class Feed:
 
 
 class Activity:
+    """Activity feed object to manage / process activities.
+
+    Args:
+        username (str): Username of the profile
+        channel (discord.TextChannel): Discord channel that the updates are processed in
+        profile (CUser): Cached user profile for extra information
+        t (Union[str, int]): Feed type. Defaults to "ANIME".
+
+    Attributes:
+        username (str): Username of the profile
+        channel (discord.TextChannel): Discord channel that the updates are processed in
+        profile (CUser): Cached user profile for extra information
+        type (Feed.TYPE): Feed type
+        feed (Feed): Feed object
+        loop: Asyncio loop
+    """
+
     def __init__(
         self,
         username: str,
@@ -210,15 +273,27 @@ class Activity:
         return Activity(username, channel, profile, t)
 
     async def get_feed(
-        self, feed: Feed
+        self, feed: Feed = None
     ) -> Dict[
         List[Union[CListActivity, CTextActivity]],
         List[Union[CListActivity, CTextActivity]],
     ]:
+        """Returns feed items from the feed
+
+        Args:
+            feed (Feed): Feed to get items. Defaults to self.feed.
+
+        Returns:
+            List[Union[CListActivity, CTextActivity]],: First 15 activities.
+            List[Union[CListActivity, CTextActivity]]]: Entire activity list.
+        """
+
+        if not feed:
+            feed = self.feed
 
         items, items_full = await feed.retrieve()
 
-        await feed.update(items, items_full)
+        await feed.update(items)
         return items, items_full
 
     def __repr__(self):
@@ -244,14 +319,25 @@ class Activity:
 
 
 class Controller(commands.Cog):
+    """Dicord cog to control commands and the active feeds.
+
+    Attributes:
+        client: Discord client instance
+        feeds (List[Activity]): Active feeds
+    """
+
     def __init__(self, client):
         self.client = client
         self.feeds: List[Activity] = []
 
     async def on_ready(self):
+        """Loads saved feeds from the database."""
+
         items = await database.feed_get()
 
-        logger.info(f"Loading {len(items)} feeds that exist in the database.")
+        logger.info(
+            f"Loading {len(items)} feed{'s' if len(items) > 1 else ''} that exist in the database."
+        )
         for item in items:
             channel = self.client.get_channel(int(item["channel"]))
 
@@ -283,6 +369,7 @@ class Controller(commands.Cog):
         logger.info(f"Loaded {len(self.feeds)}.")
 
     async def process(self):
+        """Processes all feeds with the specified interval in the config file."""
 
         while True:
 

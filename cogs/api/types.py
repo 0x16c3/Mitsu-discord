@@ -7,7 +7,6 @@ import re
 from PIL import Image
 import urllib.request, io
 from typing import Optional, Tuple, Union
-from datetime import date
 from ..utils import *
 
 # anilist
@@ -72,7 +71,9 @@ class CAnime(Anime):
                 )
                 + (
                     f"Premiered {self.season.name.title()} {self.season.year}\n"
-                    if hasattr(self, "season") and hasattr(self.season, "name") and hasattr(self.season, "year")
+                    if hasattr(self, "season")
+                    and hasattr(self.season, "name")
+                    and hasattr(self.season, "year")
                     else "Not Premiered Yet\n"
                 )
                 + (
@@ -258,8 +259,7 @@ class CUser(User):
             logger.debug(str(e))
 
     async def send_embed(
-        self,
-        channel: discord.TextChannel = None,
+        self, channel: discord.TextChannel = None, **kwargs
     ) -> Optional[discord.Embed]:
         loop = asyncio.get_event_loop()
 
@@ -378,12 +378,27 @@ class CListActivity(ListActivity):
                 else "",
             )
         else:
-            progress = "Total {} episodes. {}".format(
-                str(item.media.episodes) if hasattr(item.media, "episodes") else "???",
-                "\n Score ⭐: {}".format(listitem.score)
-                if hasattr(listitem, "score") > 0 and listitem.status == "COMPLETED"
-                else "",
-            )
+            if is_manga:
+                progress = "Total {} chapters. {}{}".format(
+                    str(item.media.chapters)
+                    if hasattr(item.media, "chapters")
+                    else "???",
+                    f"{str(item.media.chapters)} volumes. "
+                    if hasattr(item.media, "volumes")
+                    else "",
+                    "\n Score ⭐: {}".format(listitem.score)
+                    if hasattr(listitem, "score") > 0 and listitem.status == "COMPLETED"
+                    else "",
+                )
+            else:
+                progress = "Total {} episodes. {}".format(
+                    str(item.media.episodes)
+                    if hasattr(item.media, "episodes")
+                    else "???",
+                    "\n Score ⭐: {}".format(listitem.score)
+                    if hasattr(listitem, "score") > 0 and listitem.status == "COMPLETED"
+                    else "",
+                )
 
         status = ""
         if listitem.status == "CURRENT":
@@ -430,7 +445,7 @@ class CListActivity(ListActivity):
 
             if is_manga:
                 if hasattr(item.media, "chapters"):
-                    progress = f"Total chapters: {str(item.media.chapters)} chapters - {str(item.media.volumes)} volumes"
+                    progress = f"Total chapters: {str(item.media.chapters)} chapters - {str(item.media.volumes) if hasattr(item.media, 'volumes') else '???'} volumes"
                 else:
                     progress = "Total chapters: Not Available"
             else:
@@ -519,7 +534,10 @@ class CTextActivity(TextActivity):
 
     @staticmethod
     async def send_embed(
-        item: "CTextActivity", anilist: AsyncClient, channel: discord.TextChannel = None
+        item: "CTextActivity",
+        anilist: AsyncClient,
+        channel: discord.TextChannel = None,
+        **kwargs,
     ) -> Optional[discord.Embed]:
 
         user = await anilist.get_user(item.username)
@@ -538,7 +556,7 @@ class CTextActivity(TextActivity):
         )
 
         embed = discord.Embed(
-            title=f"New post on {item.username}'s profile!",
+            title=f"New post on {item.recipient.name if hasattr(item, 'recipient') else item.username}'s profile!",
             url=item.url if hasattr(item, "url") else "https://anilist.co/",
             description=f"Sent <t:{item.date.get_timestamp()}:R>",
             color=color,
@@ -571,7 +589,11 @@ class CTextActivity(TextActivity):
                 inline=False,
             )
 
-        embed.set_thumbnail(url=item.user.image.large)
+        embed.set_thumbnail(
+            url=item.recipient.image.large
+            if hasattr(item, "recipient")
+            else item.user.image.large
+        )
         embed.set_footer(
             text=f"Status activity of {item.username}",
             icon_url=user.image.medium,

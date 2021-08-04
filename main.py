@@ -42,8 +42,11 @@ async def on_ready():
 
     # sync commands
     logger.debug("Syncing commands")
-    await slash.sync_all_commands()
-    logger.debug("Synced commands")
+    try:
+        await slash.sync_all_commands()
+        logger.debug("Synced commands")
+    except:
+        logger.debug("Could not sync commands")
 
     # setup all feeds
     await client.get_cog("Controller").on_ready()
