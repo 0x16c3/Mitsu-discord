@@ -123,7 +123,7 @@ class Feed:
 
         if not self._init:
             if not len(feed):
-                logger.info("Initialized empty " + str(self))
+                logger.debug("Empty feed " + str(self))
                 return
 
             for item in feed:
