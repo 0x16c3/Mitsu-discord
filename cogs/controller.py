@@ -341,6 +341,9 @@ class Controller(commands.Cog):
         for item in items:
             channel = self.client.get_channel(int(item["channel"]))
 
+            if item in self.feeds:
+                continue
+
             if not channel:
                 logger.debug(
                     f"Could not load <{item['username']}:{item['channel']}:{item['type']}>"
