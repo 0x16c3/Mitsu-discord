@@ -354,7 +354,7 @@ class Controller(commands.Cog):
                 await database.feed_remove([item])
                 continue
 
-            permissions = channel.permissions_for(self.client)
+            permissions = channel.permissions_for(channel.guild.me)
             if not permissions:
                 logger.debug(
                     f"Could not load <{item['username']}:{item['channel']}:{item['type']}> - Invalid permissions"
@@ -452,7 +452,7 @@ class Controller(commands.Cog):
             )
             return
 
-        permissions = ctx.channel.permissions_for(self.client)
+        permissions = ctx.channel.permissions_for(ctx.guild.me)
         if not permissions or not permissions.send_messages:
             embed = discord.Embed(
                 title="`Warning`",
