@@ -464,7 +464,7 @@ class Controller(commands.Cog):
                 value="```Please grant Mitsu the 'Send Messages' permission\n'"
                 "and try again.",
             )
-            await ctx.send("Incorrect permissions", hidden=True)
+            await ctx.send("Incorrect permissions", embed=embed, hidden=True)
             return
 
         select = create_select(
