@@ -462,7 +462,7 @@ class Controller(commands.Cog):
             embed.add_field(
                 name="Error",
                 value="```Please grant Mitsu the 'Send Messages' permission\n'"
-                "and try again.",
+                "and try again.```",
             )
             await ctx.send("Incorrect permissions", embed=embed, hidden=True)
             return
