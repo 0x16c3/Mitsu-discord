@@ -338,8 +338,11 @@ class Controller(commands.Cog):
         logger.info(
             f"Loading {len(items)} feed{'s' if len(items) > 1 else ''} that exist in the database."
         )
+
+        error_channel_ids = []
+
         for item in items:
-            channel = self.client.get_channel(int(item["channel"]))
+            channel: discord.TextChannel = self.client.get_channel(int(item["channel"]))
 
             if item in self.feeds:
                 continue
@@ -347,6 +350,42 @@ class Controller(commands.Cog):
             if not channel:
                 logger.debug(
                     f"Could not load <{item['username']}:{item['channel']}:{item['type']}>"
+                )
+                await database.feed_remove([item])
+                continue
+
+            permissions = channel.permissions_for(self.client)
+            if not permissions:
+                logger.debug(
+                    f"Could not load <{item['username']}:{item['channel']}:{item['type']}> - Invalid permissions"
+                )
+                continue
+            elif not permissions.send_messages:
+
+                if channel.id not in error_channel_ids:
+                    guild = channel.guild
+                    owner = guild.get_member(guild.owner_id)
+
+                    embed = discord.Embed(
+                        title="`Warning`",
+                        description=f"Missing Access\nCannot send messages to channel `#{channel.name}`",
+                        color=color_warn,
+                    )
+                    embed.add_field(
+                        name="Error",
+                        value="```The feed has been automatically removed.\n"
+                        "Please setup a feed again after giving Mitsu the 'Send Messages' permission.```",
+                    )
+
+                    try:
+                        await owner.send(embed=embed)
+                    except:
+                        pass
+
+                    error_channel_ids.append(channel.id)
+
+                logger.debug(
+                    f"Could not load <{item['username']}:{item['channel']}:{item['type']}> - Incorrect permissions"
                 )
                 await database.feed_remove([item])
                 continue
@@ -370,6 +409,7 @@ class Controller(commands.Cog):
             )
 
         logger.info(f"Loaded {len(self.feeds)}.")
+        del error_channel_ids
 
     async def process(self):
         """Processes all feeds with the specified interval in the config file."""
@@ -410,6 +450,21 @@ class Controller(commands.Cog):
             await ctx.send(
                 "You don't have the permission to use this command.", hidden=True
             )
+            return
+
+        permissions = ctx.channel.permissions_for(self.client)
+        if not permissions or not permissions.send_messages:
+            embed = discord.Embed(
+                title="`Warning`",
+                description=f"Missing Access\nCannot send messages to this channel.",
+                color=color_warn,
+            )
+            embed.add_field(
+                name="Error",
+                value="```Please grant Mitsu the 'Send Messages' permission\n'"
+                "and try again.",
+            )
+            await ctx.send("Incorrect permissions", hidden=True)
             return
 
         select = create_select(
@@ -595,7 +650,7 @@ class Controller(commands.Cog):
             custom_id="_edit0",
             options=[
                 create_select_option(
-                    label=i if len(i) <= 25 else i[:22] + "...",
+                    label=i if len(i) <= 100 else i[:97] + "...",
                     description=", ".join(
                         [Feed.get_type(f.type) for f in items if f.username == i]
                     ),
@@ -633,7 +688,7 @@ class Controller(commands.Cog):
                     custom_id="_edit1",
                     options=[
                         create_select_option(
-                            label=(i if len(i) <= 25 else (i[:22] + "...")),
+                            label=(i if len(i) <= 100 else (i[:97] + "...")),
                             description=", ".join(
                                 [Feed.get_type(i.type) for i in all_types]
                             ),
@@ -691,7 +746,7 @@ class Controller(commands.Cog):
                             custom_id="_edit1",
                             options=[
                                 create_select_option(
-                                    label=(i if len(i) <= 25 else (i[:22] + "...")),
+                                    label=(i if len(i) <= 100 else (i[:97] + "...")),
                                     description=", ".join(
                                         [Feed.get_type(i.type) for i in all_types]
                                     ),
@@ -732,7 +787,7 @@ class Controller(commands.Cog):
                             custom_id="_edit1",
                             options=[
                                 create_select_option(
-                                    label=(i if len(i) <= 25 else (i[:22] + "...")),
+                                    label=(i if len(i) <= 100 else (i[:97] + "...")),
                                     description=", ".join(
                                         [Feed.get_type(i.type) for i in all_types]
                                     ),
@@ -978,28 +1033,28 @@ class Controller(commands.Cog):
                     label=(
                         (
                             i.title.romaji
-                            if len(i.title.romaji) <= 25
-                            else i.title.romaji[:22] + "..."
+                            if len(i.title.romaji) <= 100
+                            else i.title.romaji[:97] + "..."
                         )
                         if media != "character"
                         else (
                             i.name.full
-                            if len(i.name.full) <= 25
-                            else i.name.full[:22] + "..."
+                            if len(i.name.full) <= 100
+                            else i.name.full[:97] + "..."
                         )
                     ),
                     description=(
                         (
                             (
                                 i.title.english
-                                if len(i.title.english) <= 50
-                                else i.title.english[:47] + "..."
+                                if len(i.title.english) <= 100
+                                else i.title.english[:97] + "..."
                             )
                             if hasattr(i.title, "english")
                             else (
                                 i.title.native
-                                if len(i.title.native) <= 50
-                                else i.title.native[:47] + "..."
+                                if len(i.title.native) <= 100
+                                else i.title.native[:97] + "..."
                             )
                         )
                         if media != "character"
@@ -1048,28 +1103,28 @@ class Controller(commands.Cog):
                             label=(
                                 (
                                     i.title.romaji
-                                    if len(i.title.romaji) <= 25
-                                    else i.title.romaji[:22] + "..."
+                                    if len(i.title.romaji) <= 100
+                                    else i.title.romaji[:97] + "..."
                                 )
                                 if media != "character"
                                 else (
                                     i.name.full
-                                    if len(i.name.full) <= 25
-                                    else i.name.full[:22] + "..."
+                                    if len(i.name.full) <= 100
+                                    else i.name.full[:97] + "..."
                                 )
                             ),
                             description=(
                                 (
                                     (
                                         i.title.english
-                                        if len(i.title.english) <= 50
-                                        else i.title.english[:47] + "..."
+                                        if len(i.title.english) <= 100
+                                        else i.title.english[:97] + "..."
                                     )
                                     if hasattr(i.title, "english")
                                     else (
                                         i.title.native
-                                        if len(i.title.native) <= 50
-                                        else i.title.native[:47] + "..."
+                                        if len(i.title.native) <= 100
+                                        else i.title.native[:97] + "..."
                                     )
                                 )
                                 if media != "character"
