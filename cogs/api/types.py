@@ -463,7 +463,7 @@ class CListActivity(ListActivity):
                 if hasattr(item.media.title, "english")
                 else (item.media.title.native + "\n")
             )
-            + (f"Updated <t:{item.date.get_timestamp()}:D>"),
+            + (f"Updated <t:{item.date.get_timestamp()}:R>"),
             color=color,
         )
         embed.add_field(
@@ -540,16 +540,26 @@ class CTextActivity(TextActivity):
         **kwargs,
     ) -> Optional[discord.Embed]:
 
-        user = await anilist.get_user(item.username)
+        # user == sender
+        if not hasattr(item, "user"):
+            return None
+
+        user = await anilist.get_user(item.user.name)
         if not user:
             return None
 
         user = CUser.create(user)
-
-        if not hasattr(item, "user"):
-            return None
-
         item.user = user
+
+        if hasattr(item, "recipient"):
+            received = True
+
+            recipient = await anilist.get_user(item.recipient.name)
+            if not recipient:
+                return None
+
+            recipient = CUser.create(recipient)
+            item.recipient = recipient
 
         color = discord.Color.from_rgb(
             user.profile_color[0], user.profile_color[1], user.profile_color[2]
