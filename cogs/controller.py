@@ -471,7 +471,7 @@ class Controller(commands.Cog):
             custom_id="_activity0",
             options=[
                 create_select_option(
-                    label=k.title(),
+                    label=k.title()[:25],
                     value=str(v),
                     default=(
                         v
@@ -513,7 +513,7 @@ class Controller(commands.Cog):
                     custom_id="_activity1",
                     options=[
                         create_select_option(
-                            label=k.title(),
+                            label=k.title()[:25],
                             value=str(v),
                             default=v in selected,
                         )
@@ -534,7 +534,7 @@ class Controller(commands.Cog):
                     custom_id="_activity1",
                     options=[
                         create_select_option(
-                            label=k.title(),
+                            label=k.title()[:25],
                             value=str(v),
                             default=v in selected,
                         )
@@ -650,7 +650,7 @@ class Controller(commands.Cog):
             custom_id="_edit0",
             options=[
                 create_select_option(
-                    label=i if len(i) <= 100 else i[:97] + "...",
+                    label=i if len(i) <= 25 else i[:22] + "...",
                     description=", ".join(
                         [Feed.get_type(f.type) for f in items if f.username == i]
                     ),
@@ -688,7 +688,7 @@ class Controller(commands.Cog):
                     custom_id="_edit1",
                     options=[
                         create_select_option(
-                            label=(i if len(i) <= 100 else (i[:97] + "...")),
+                            label=(i if len(i) <= 25 else (i[:22] + "...")),
                             description=", ".join(
                                 [Feed.get_type(i.type) for i in all_types]
                             ),
@@ -707,7 +707,7 @@ class Controller(commands.Cog):
                     custom_id="_activeSub0",
                     options=[
                         create_select_option(
-                            label=k.title(),
+                            label=k.title()[:25],
                             value=str(v),
                             default=v in [i.type for i in all_types],
                         )
@@ -746,7 +746,7 @@ class Controller(commands.Cog):
                             custom_id="_edit1",
                             options=[
                                 create_select_option(
-                                    label=(i if len(i) <= 100 else (i[:97] + "...")),
+                                    label=(i if len(i) <= 25 else (i[:22] + "...")),
                                     description=", ".join(
                                         [Feed.get_type(i.type) for i in all_types]
                                     ),
@@ -766,7 +766,7 @@ class Controller(commands.Cog):
                             custom_id="_editSub1",
                             options=[
                                 create_select_option(
-                                    label=k.title(),
+                                    label=k.title()[:25],
                                     value=str(v),
                                     default=v in selected,
                                 )
@@ -787,7 +787,7 @@ class Controller(commands.Cog):
                             custom_id="_edit1",
                             options=[
                                 create_select_option(
-                                    label=(i if len(i) <= 100 else (i[:97] + "...")),
+                                    label=(i if len(i) <= 25 else (i[:22] + "...")),
                                     description=", ".join(
                                         [Feed.get_type(i.type) for i in all_types]
                                     ),
@@ -807,7 +807,7 @@ class Controller(commands.Cog):
                             custom_id="_editSub1",
                             options=[
                                 create_select_option(
-                                    label=k.title(),
+                                    label=k.title()[:25],
                                     value=str(v),
                                     default=v in selected,
                                 )
@@ -1033,14 +1033,14 @@ class Controller(commands.Cog):
                     label=(
                         (
                             i.title.romaji
-                            if len(i.title.romaji) <= 100
-                            else i.title.romaji[:97] + "..."
+                            if len(i.title.romaji) <= 25
+                            else i.title.romaji[:22] + "..."
                         )
                         if media != "character"
                         else (
                             i.name.full
-                            if len(i.name.full) <= 100
-                            else i.name.full[:97] + "..."
+                            if len(i.name.full) <= 25
+                            else i.name.full[:22] + "..."
                         )
                     ),
                     description=(
@@ -1103,14 +1103,14 @@ class Controller(commands.Cog):
                             label=(
                                 (
                                     i.title.romaji
-                                    if len(i.title.romaji) <= 100
-                                    else i.title.romaji[:97] + "..."
+                                    if len(i.title.romaji) <= 25
+                                    else i.title.romaji[:22] + "..."
                                 )
                                 if media != "character"
                                 else (
                                     i.name.full
-                                    if len(i.name.full) <= 100
-                                    else i.name.full[:97] + "..."
+                                    if len(i.name.full) <= 25
+                                    else i.name.full[:22] + "..."
                                 )
                             ),
                             description=(
