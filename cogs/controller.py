@@ -398,6 +398,14 @@ class Controller(commands.Cog):
             user: Activity = await Activity.create(
                 item["username"], channel, int(item["type"])
             )
+
+            if not user:
+                logger.debug(
+                    f"Could not load <{item['username']}:{item['channel']}:{item['type']}>"
+                )
+                await database.feed_remove([item])
+                continue
+
             self.feeds.append(user)
 
         for user in self.feeds:
