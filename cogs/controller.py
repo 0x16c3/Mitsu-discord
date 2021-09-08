@@ -51,6 +51,8 @@ class Feed:
         self.arguments = None
         self.type = None
 
+        self.errors = 0
+
         if self.feed == self.TYPE["ANIME"]:
             self.type = CListActivity
             self.function = anilist.get_activity
@@ -107,8 +109,11 @@ class Feed:
                 obj = self.type.create(item, self.username)
                 res.append(obj)
 
+            self.errors = 0
+
         except Exception as e:
             logger.print("Error on {}: {}".format(self.username, e))
+            self.errors += 1
             return [], []
 
         return res[:15], res
@@ -567,7 +572,7 @@ class Controller(commands.Cog):
                     ),
                     color=color_errr,
                 )
-                await button_ctx.edit_origin("An error occured!", embed=embed)
+                await button_ctx.edit_origin(content="An error occured!", embed=embed)
                 return
 
             user = None
@@ -828,24 +833,38 @@ class Controller(commands.Cog):
                     activities = []
                     activities_failed = []
 
-                    try:
-                        profile = await anilist.get_user(name=username)
-                        profile = CUser.create(profile)
-                    except:
-                        embed = discord.Embed(
-                            title="Could not start tracking!",
-                            description=(
-                                "There has been an error fetching this profile.\n"
-                                "Please double-check the username or try again later."
-                            ),
-                            color=color_errr,
+                    for i in [
+                        x
+                        for x in self.feeds
+                        if x.username == username and x.type not in selected
+                    ]:
+                        self.feeds.remove(i)
+                        await database.feed_remove([i.JSON()])
+                        activities.append(
+                            f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
                         )
-                        await button_ctx.edit_origin("An error occured!", embed=embed)
-                        return
 
                     user = None
+                    profile = None
 
                     for i in selected:
+
+                        if not profile:
+                            try:
+                                profile = await anilist.get_user(name=username)
+                                profile = CUser.create(profile)
+                            except:
+                                embed = discord.Embed(
+                                    title="Could not start tracking!",
+                                    description=(
+                                        "There has been an error fetching this profile.\n"
+                                        "Please double-check the username or try again later."
+                                    ),
+                                    color=color_errr,
+                                )
+                                await button_ctx.edit_origin(content="An error occured!", embed=embed)
+                                return
+
                         user: Activity = await Activity.create(
                             username, ctx.channel, i, profile
                         )
@@ -866,16 +885,6 @@ class Controller(commands.Cog):
                             activities.append(
                                 f"`Started {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)].lower()}`"
                             )
-                    for i in [
-                        x
-                        for x in self.feeds
-                        if x.username == username and x.type not in selected
-                    ]:
-                        self.feeds.remove(i)
-                        await database.feed_remove([i.JSON()])
-                        activities.append(
-                            f"`Stopped {list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(int(i.type))].lower()}`"
-                        )
 
                     embed = discord.Embed(
                         title="Done!",
