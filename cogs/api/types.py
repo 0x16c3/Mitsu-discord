@@ -264,8 +264,14 @@ class CUser(User):
         loop = asyncio.get_event_loop()
 
         estimate = await loop.run_in_executor(None, self.get_picture_color)
+        colors = len(estimate) - 1
 
-        color = discord.Color.from_rgb(estimate[0], estimate[1], estimate[2])
+        if colors < 0:
+            color = color_main
+        else:
+            color = discord.Color.from_rgb(
+                estimate[0], estimate[min(1, colors)], estimate[min(2, colors)]
+            )
 
         embed = discord.Embed(
             title=f"{self.name}'s Profile",

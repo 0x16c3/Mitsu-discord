@@ -1,5 +1,4 @@
 # discord imports
-from os import terminal_size
 import discord
 from discord.ext import commands
 import asyncio
@@ -870,7 +869,9 @@ class Controller(commands.Cog):
                                     ),
                                     color=color_errr,
                                 )
-                                await button_ctx.edit_origin(content="An error occured!", embed=embed)
+                                await button_ctx.edit_origin(
+                                    content="An error occured!", embed=embed
+                                )
                                 return
 
                         user: Activity = await Activity.create(
@@ -914,7 +915,11 @@ class Controller(commands.Cog):
                     )
 
             except:
-                await message.delete()
+                try:
+                    await message.delete()
+                except discord.errors.NotFound:
+                    pass
+
                 break
 
         return
