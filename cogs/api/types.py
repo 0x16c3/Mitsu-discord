@@ -264,6 +264,9 @@ class CUser(User):
         loop = asyncio.get_event_loop()
 
         estimate = await loop.run_in_executor(None, self.get_picture_color)
+        if isinstance(estimate, int):
+            estimate = [estimate, estimate, estimate]
+
         colors = len(estimate) - 1
 
         if colors < 0:
@@ -389,7 +392,7 @@ class CListActivity(ListActivity):
                     str(item.media.chapters)
                     if hasattr(item.media, "chapters")
                     else "???",
-                    f"{str(item.media.chapters)} volumes. "
+                    f"{str(item.media.volumes)} volumes. "
                     if hasattr(item.media, "volumes")
                     else "",
                     "\n Score ⭐: {}".format(listitem.score)

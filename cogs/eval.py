@@ -21,6 +21,7 @@ from cogs.api.types import (
     CFavouritesUnion,
     CStatisticsUnion,
 )
+from cogs.api.recommend import Recommender
 from cogs.api.database import Database, database
 from cogs.utils import *
 
@@ -97,7 +98,8 @@ class Eval(commands.Cog):
             "json": json,
             "Controller": Controller,
             "Feed": Feed,
-            "AnimeFeed": Activity,
+            "Activity": Activity,
+            "Recommender": Recommender,
             "Database": Database,
             "database": database,
             "TinyDB": TinyDB,
