@@ -20,6 +20,7 @@
 | .                                       |                                                           |
 | **Commands**                            |                                                           |
 | `/activity <username>`                  | `setup AniList feed in current channel (Manage Webhooks)` |
+| `/filter`                               | `filter status types in current channel`                  |
 | `/edit`                                 | `edit active feeds in current channel (Manage Webhooks)`  |
 | `/active [scope]`                       | `get active feeds in the specified scope`                 |
 | `/profile <username> [send-message]`    | `get AniList profile of specified user`                   |
