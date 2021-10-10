@@ -925,6 +925,126 @@ class Controller(commands.Cog):
         return
 
     @cog_ext.cog_slash(
+        name="filter",
+        description="Filter list activity types for this channel.",
+        guild_ids=get_debug_guild_id(),
+    )
+    async def _filter(self, ctx: SlashContext):
+
+        if not ctx.author.permissions_in(ctx.channel).manage_webhooks:
+            await ctx.send(
+                "You don't have the permission to use this command.", hidden=True
+            )
+            return
+
+        channels = await database.channel_get()
+        matching = [
+            channel for channel in channels if int(channel["channel"]) == ctx.channel.id
+        ]
+        if len(matching):
+            current = matching[0]
+        else:
+            current = {
+                "channel": ctx.channel.id,
+                "list_block_progress": False,
+                "list_block_planning": False,
+                "list_block_dropped": False,
+                "list_block_paused": False,
+            }
+
+        select = create_select(
+            custom_id="_filter0",
+            options=[
+                create_select_option(
+                    label=i.capitalize(),
+                    value=i,
+                    default=not current[f"list_block_{i}"],
+                )
+                for i in ["progress", "planning", "dropped", "paused"]
+            ],
+            max_values=4,
+            placeholder="Filter enabled list activities for this channel.",
+        )
+        actionrow = create_actionrow(select)
+
+        message = await ctx.send(
+            content="Select list activity filters", components=[actionrow], hidden=False
+        )
+
+        def check_author(cctx: ComponentContext):
+            return ctx.author.id == cctx.author.id
+
+        while True:
+            try:
+                button_ctx: ComponentContext = await wait_for_component(
+                    self.client,
+                    components=[actionrow],
+                    check=check_author,
+                    timeout=30,
+                )
+
+                selected: List[str] = [i for i in button_ctx.selected_options]
+                await button_ctx.defer(edit_origin=True)
+
+                for i in ["progress", "planning", "dropped", "paused"]:
+                    if i in selected and current[f"list_block_{i}"]:
+                        current[f"list_block_{i}"] = False
+                    elif i not in selected and not current[f"list_block_{i}"]:
+                        current[f"list_block_{i}"] = True
+
+                channels = await database.channel_get()
+                matching = [
+                    channel
+                    for channel in channels
+                    if int(channel["channel"]) == ctx.channel.id
+                ]
+                if len(matching):
+                    await database.channel_update(ctx.channel.id, current)
+                else:
+                    await database.channel_insert([current])
+
+                select = create_select(
+                    custom_id="_filter1",
+                    options=[
+                        create_select_option(
+                            label=i.capitalize(),
+                            value=i,
+                            default=not current[f"list_block_{i}"],
+                        )
+                        for i in ["progress", "planning", "dropped", "paused"]
+                    ],
+                    max_values=4,
+                    placeholder="Filter enabled list activities for this channel.",
+                )
+                actionrow = create_actionrow(select)
+
+                await message.edit(
+                    content=f"Select list activity filters", components=[actionrow]
+                )
+            except:
+                select = create_select(
+                    custom_id="_filter2",
+                    options=[
+                        create_select_option(
+                            label=i.capitalize(),
+                            value=i,
+                            default=not current[f"list_block_{i}"],
+                        )
+                        for i in ["progress", "planning", "dropped", "paused"]
+                    ],
+                    max_values=4,
+                    placeholder="Filter enabled list activities for this channel.",
+                    disabled=True,
+                )
+                actionrow = create_actionrow(select)
+
+                await message.edit(
+                    content=f"Select list activity filters",
+                    components=[actionrow],
+                )
+                return
+
+    @cog_ext.cog_slash(
         name="active",
         description="See active feeds.",
         guild_ids=get_debug_guild_id(),

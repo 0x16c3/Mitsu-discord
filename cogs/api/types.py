@@ -8,6 +8,7 @@ from PIL import Image
 import urllib.request, io
 from typing import Optional, Tuple, Union
 from ..utils import *
+from .database import database
 
 # anilist
 from anilist import AsyncClient
@@ -375,6 +376,27 @@ class CListActivity(ListActivity):
         user = CUser.create(user)
         listitem: MediaList
 
+
+        if channel:
+            channels = await database.channel_get()
+            matching = [ch for ch in channels if int(ch["channel"]) == channel.id]
+            if len(matching):
+                ch = matching[0]
+
+                # progress
+                if listitem.status in ["CURRENT", "REPEATING", "COMPLETED"]:
+                    if ch["list_block_progress"]:
+                        return None
+                elif listitem.status == "PAUSED":
+                    if ch["list_block_paused"]:
+                        return None
+                elif listitem.status == "DROPPED":
+                    if ch["list_block_dropped"]:
+                        return None
+                elif listitem.status == "PLANNING":
+                    if ch["list_block_planning"]:
+                        return None
+
         color = discord.Color(0x000000)
 
         is_manga = isinstance(item.media, Manga)
@@ -411,7 +433,7 @@ class CListActivity(ListActivity):
 
         status = ""
         if listitem.status == "CURRENT":
-            if listitem.progress == 0:
+            if listitem.progress <= 1:
                 progress = f"Just started {'reading' if is_manga else 'watching'}."
 
             status = "Reading" if is_manga else "Watching"
