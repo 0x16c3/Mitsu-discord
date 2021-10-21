@@ -574,7 +574,7 @@ class CListActivity(ListActivity):
                             try:
                                 await feed.sent_message.delete()
                             except Exception as e:
-                                logger.debug(
+                                logger.info(
                                     f"Cannot remove message -> {str(channel.id)} : {item.username} {e}"
                                 )
 
