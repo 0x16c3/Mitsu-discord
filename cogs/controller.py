@@ -19,6 +19,7 @@ from .utils import *
 from .api.database import database
 from .api.types import CCharacter, CUser, CAnime, CManga, CListActivity, CTextActivity
 from typing import Union
+import sys
 
 
 class Feed:
@@ -111,7 +112,13 @@ class Feed:
             self.errors = 0
 
         except Exception as e:
-            logger.print("Error on {}: {}".format(self.username, e))
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            logger.print(
+                "Error on {}: {}\n[STACK] {} {} {}".format(
+                    self.username, e, exc_type, fname, exc_tb.tb_lineno
+                )
+            )
             self.errors += 1
             return [], []
 
@@ -164,15 +171,28 @@ class Feed:
         """
 
         processed = False
+        item_old = None
 
         if item not in self.entries_processed:
 
             if func:
                 try:
-                    await func(item=item, **kwargs)
+                    res = await func(item=item, **kwargs)
+
+                    if isinstance(res, tuple):
+                        if res[0] == "List[CListActivity]":
+                            self.entries = res[1]
+                            item_old = item
+                            item = res[2]
+
                 except Exception as e:
+
+                    exc_type, exc_obj, exc_tb = sys.exc_info()
+                    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                     logger.print(
-                        "Error running function on entry {}: {}".format(item.id, e)
+                        "Error running function on entry {}: {}\n[STACK] {} {} {}".format(
+                            item.id, e, exc_type, fname, exc_tb.tb_lineno
+                        )
                     )
 
             if self.type == CListActivity:
@@ -418,6 +438,7 @@ class Controller(commands.Cog):
                 channel=user.channel,
                 anilist=anilist,
                 filter_adult=enable_filter,
+                activity=user,
             )
 
         logger.info(f"Loaded {len(self.feeds)}.")
@@ -441,6 +462,7 @@ class Controller(commands.Cog):
                     channel=user.channel,
                     anilist=anilist,
                     filter_adult=enable_filter,
+                    activity=user,
                 )
 
     @cog_ext.cog_slash(
@@ -843,7 +865,9 @@ class Controller(commands.Cog):
                     for i in [
                         x
                         for x in self.feeds
-                        if x.username == username and x.type not in selected
+                        if x.username == username
+                        and x.channel == ctx.channel
+                        and x.type not in selected
                     ]:
                         self.feeds.remove(i)
                         await database.feed_remove([i.JSON()])

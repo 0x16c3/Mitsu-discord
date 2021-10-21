@@ -322,6 +322,7 @@ class CUser(User):
 class CListActivity(ListActivity):
 
     username = None
+    sent_message = None
 
     @staticmethod
     def create(obj: ListActivity, username: str = None) -> "CListActivity":
@@ -329,6 +330,8 @@ class CListActivity(ListActivity):
 
         if username:
             obj.username = username
+
+        obj.sent_message = None
 
         return obj
 
@@ -367,7 +370,12 @@ class CListActivity(ListActivity):
         anilist: AsyncClient,
         channel: discord.TextChannel = None,
         filter_adult: bool = True,
+        activity=None,
     ) -> Optional[discord.Embed]:
+
+        item_idx = -1
+        if activity:
+            item_idx = activity.feed.entries.index(item)
 
         user, listitem = await item.get_list(anilist)
         if not user or not listitem:
@@ -375,7 +383,6 @@ class CListActivity(ListActivity):
 
         user = CUser.create(user)
         listitem: MediaList
-
 
         if channel:
             channels = await database.channel_get()
@@ -401,6 +408,7 @@ class CListActivity(ListActivity):
 
         is_manga = isinstance(item.media, Manga)
 
+        merged = False
         if item.status and item.status.progress:
             progress = "{}. {}".format(
                 item.status,
@@ -408,6 +416,9 @@ class CListActivity(ListActivity):
                 if hasattr(listitem, "score") > 0 and listitem.status == "COMPLETED"
                 else "",
             )
+
+            if "-" in str(item.status):
+                merged = True
         else:
             if is_manga:
                 progress = "Total {} chapters. {}{}".format(
@@ -543,9 +554,37 @@ class CListActivity(ListActivity):
 
         if channel:
             try:
-                await channel.send(embed=embed)
+                if activity and merged:
+                    for idx, feed in enumerate(activity.feed.entries_processed):
+                        feed: "CListActivity"
+
+                        if (
+                            not feed.sent_message
+                            or feed.media.id != item.media.id
+                            or feed.status.string
+                            not in [
+                                "WATCHED EPISODE",
+                                "REWATCHED EPISODE",
+                                "READ CHAPTER",
+                                "REREAD CHAPTER",
+                            ]
+                        ):
+                            continue
+                        else:
+                            try:
+                                await feed.sent_message.delete()
+                            except Exception as e:
+                                logger.debug(
+                                    f"Cannot remove message -> {str(channel.id)} : {item.username} {e}"
+                                )
+
+                    item.sent_message = await channel.send(embed=embed)
+                    activity.feed.entries[item_idx] = item
+
+                    return "List[CListActivity]", activity.feed.entries, item
+                return None
             except Exception as e:
-                logger.info(
+                logger.debug(
                     f"Cannot send message -> {str(channel.id)} : {item.username} {e}"
                 )
         else:
