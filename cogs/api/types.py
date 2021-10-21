@@ -582,7 +582,10 @@ class CListActivity(ListActivity):
                     activity.feed.entries[item_idx] = item
 
                     return "List[CListActivity]", activity.feed.entries, item
-                return None
+
+                else:
+                    await channel.send(embed=embed)
+
             except Exception as e:
                 logger.debug(
                     f"Cannot send message -> {str(channel.id)} : {item.username} {e}"
