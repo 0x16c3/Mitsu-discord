@@ -554,7 +554,7 @@ class CListActivity(ListActivity):
 
         if channel:
             try:
-                if activity and merged:
+                if activity:
                     for idx, feed in enumerate(activity.feed.entries_processed):
                         feed: "CListActivity"
 
@@ -571,12 +571,15 @@ class CListActivity(ListActivity):
                         ):
                             continue
                         else:
-                            try:
-                                await feed.sent_message.delete()
-                            except Exception as e:
-                                logger.info(
-                                    f"Cannot remove message -> {str(channel.id)} : {item.username} {e}"
-                                )
+                            if not merged:
+                                pass
+                            else:
+                                try:
+                                    await feed.sent_message.delete()
+                                except Exception as e:
+                                    logger.info(
+                                        f"Cannot remove message -> {str(channel.id)} : {item.username}\n{e}"
+                                    )
 
                     item.sent_message = await channel.send(embed=embed)
                     activity.feed.entries[item_idx] = item
@@ -584,7 +587,10 @@ class CListActivity(ListActivity):
                     return "List[CListActivity]", activity.feed.entries, item
 
                 else:
-                    await channel.send(embed=embed)
+                    item.sent_message = await channel.send(embed=embed)
+                    activity.feed.entries[item_idx] = item
+
+                    return "List[CListActivity]", activity.feed.entries, item
 
             except Exception as e:
                 logger.debug(
