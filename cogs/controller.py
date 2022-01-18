@@ -1190,7 +1190,7 @@ class Controller(commands.Cog):
     )
     async def _search(self, ctx: SlashContext, media: str, query: str) -> CAnime:
         results: List[Union[CAnime, CManga]] = await anilist.search(
-            query, content_type=media, page=1, limit=5
+            query, content_type=media, page=1, limit=5, pagination=False
         )
         select = create_select(
             custom_id="_search0",

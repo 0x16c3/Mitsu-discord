@@ -391,7 +391,15 @@ class CListActivity(ListActivity):
                 ch = matching[0]
 
                 # progress
-                if listitem.status in ["CURRENT", "REPEATING", "COMPLETED"]:
+                if (
+                    listitem.status
+                    in [
+                        "CURRENT",
+                        "REPEATING",
+                        "COMPLETED",
+                    ]
+                    or item.status in ["REWATCHED", "REREAD"]
+                ):
                     if ch["list_block_progress"]:
                         return None
                 elif listitem.status == "PAUSED":
@@ -514,7 +522,7 @@ class CListActivity(ListActivity):
             inline=False,
         )
 
-        if listitem.status == "COMPLETED" or listitem.status == "PLANNING":
+        if listitem.status in ["COMPLETED", "PLANNING"]:
             if is_manga:
                 cobj = CManga.create(item.media)
             else:
