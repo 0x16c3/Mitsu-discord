@@ -1213,14 +1213,14 @@ class Controller(commands.Cog):
                         (
                             (
                                 i.title.english
-                                if len(i.title.english) <= 100
-                                else i.title.english[:97] + "..."
+                                if len(i.title.english) <= 50
+                                else i.title.english[:47] + "..."
                             )
                             if hasattr(i.title, "english")
                             else (
                                 i.title.native
-                                if len(i.title.native) <= 100
-                                else i.title.native[:97] + "..."
+                                if len(i.title.native) <= 50
+                                else i.title.native[:47] + "..."
                             )
                         )
                         if media != "character"
@@ -1283,14 +1283,14 @@ class Controller(commands.Cog):
                                 (
                                     (
                                         i.title.english
-                                        if len(i.title.english) <= 100
-                                        else i.title.english[:97] + "..."
+                                        if len(i.title.english) <= 50
+                                        else i.title.english[:47] + "..."
                                     )
                                     if hasattr(i.title, "english")
                                     else (
                                         i.title.native
-                                        if len(i.title.native) <= 100
-                                        else i.title.native[:97] + "..."
+                                        if len(i.title.native) <= 50
+                                        else i.title.native[:47] + "..."
                                     )
                                 )
                                 if media != "character"
