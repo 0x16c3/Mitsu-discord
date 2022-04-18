@@ -439,6 +439,7 @@ class Controller(commands.Cog):
                 await asyncio.sleep(60)
 
         logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
+        await asyncio.sleep(60)
 
         for i, user in enumerate(self.feeds):
             user: Activity
