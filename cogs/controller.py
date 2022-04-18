@@ -443,9 +443,9 @@ class Controller(commands.Cog):
             )
 
             # wait 60 seconds after every 30 feeds to prevent rate limiting
-            if i % 30 == 0:
+            if i % 30 == 0 and i >= 30:
                 logger.info(f"Waiting 60 seconds.")
-                await asyncio.sleep(30)
+                await asyncio.sleep(60)
 
         logger.info(f"Loaded {len(self.feeds)}.")
         self.loaded = True
@@ -462,7 +462,7 @@ class Controller(commands.Cog):
 
             await asyncio.sleep(int(config["INTERVAL"]))
 
-            for user in self.feeds:
+            for i, user in enumerate(self.feeds):
                 user: Activity
 
                 enable_filter = not user.channel.is_nsfw()
@@ -475,6 +475,11 @@ class Controller(commands.Cog):
                     filter_adult=enable_filter,
                     activity=user,
                 )
+
+                # wait 60 seconds after every 30 feeds to prevent rate limiting
+                if i % 30 == 0 and i >= 30:
+                    logger.info(f"Waiting 60 seconds.")
+                    await asyncio.sleep(60)
 
     @cog_ext.cog_slash(
         name="activity",
