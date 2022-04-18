@@ -353,6 +353,7 @@ class Controller(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.feeds: List[Activity] = []
+        self.loaded = False
 
     async def on_ready(self):
         """Loads saved feeds from the database."""
@@ -365,7 +366,7 @@ class Controller(commands.Cog):
 
         error_channel_ids = []
 
-        for item in items:
+        for i, item in enumerate(items):
             channel: discord.TextChannel = self.client.get_channel(int(item["channel"]))
 
             if item in self.feeds:
@@ -427,6 +428,10 @@ class Controller(commands.Cog):
 
             self.feeds.append(user)
 
+            # wait 60 seconds after every 40 feed to prevent rate limiting
+            if i % 40 == 0:
+                await asyncio.sleep(30)
+
         for user in self.feeds:
             user: Activity
 
@@ -442,12 +447,17 @@ class Controller(commands.Cog):
             )
 
         logger.info(f"Loaded {len(self.feeds)}.")
+        self.loaded = True
         del error_channel_ids
 
     async def process(self):
         """Processes all feeds with the specified interval in the config file."""
 
         while True:
+
+            if not self.loaded:
+                await asyncio.sleep(5)
+                continue
 
             await asyncio.sleep(int(config["INTERVAL"]))
 
