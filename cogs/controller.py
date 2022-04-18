@@ -371,7 +371,7 @@ class Controller(commands.Cog):
 
         error_channel_ids = []
 
-        for item in items:
+        for i, item in enumerate(items):
             channel: discord.TextChannel = self.client.get_channel(int(item["channel"]))
 
             if item in self.feeds:
