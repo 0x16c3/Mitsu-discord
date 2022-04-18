@@ -27,6 +27,7 @@ class Feed:
 
     Args:
         username (str): Username of the profile
+        userid (int): User id of the profile
         feed (int): Feed type
 
     Attributes:
@@ -43,8 +44,10 @@ class Feed:
     def get_type(i: any):
         return list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)]
 
-    def __init__(self, username: str, feed: int) -> None:
+    def __init__(self, username: str, userid: int, feed: int) -> None:
         self.username = username
+        self.userid = userid
+
         self.feed = feed
 
         self.function = None
@@ -57,21 +60,21 @@ class Feed:
             self.type = CListActivity
             self.function = anilist.get_activity
             self.arguments = {
-                "id": self.username,
+                "id": self.userid,
                 "content_type": "anime",
             }
         if self.feed == self.TYPE["MANGA"]:
             self.type = CListActivity
             self.function = anilist.get_activity
             self.arguments = {
-                "id": self.username,
+                "id": self.userid,
                 "content_type": "manga",
             }
         if self.feed == self.TYPE["TEXT"]:
             self.type = CTextActivity
             self.function = anilist.get_activity
             self.arguments = {
-                "id": self.username,
+                "id": self.userid,
                 "content_type": "text",
             }
 
@@ -266,16 +269,18 @@ class Activity:
     def __init__(
         self,
         username: str,
+        userid: int,
         channel: discord.TextChannel,
         profile: CUser,
         t: Union[str, int] = "ANIME",
     ) -> None:
         self.username = username
+        self.userid = userid
         self.channel = channel
         self.profile = profile
 
         self.type = Feed.TYPE[t] if isinstance(t, str) else t
-        self.feed = Feed(username, self.type)
+        self.feed = Feed(username, userid, self.type)
 
         self.loop = None
 
@@ -294,7 +299,7 @@ class Activity:
             except:
                 return None
 
-        return Activity(username, channel, profile, t)
+        return Activity(username, profile.id, channel, profile, t)
 
     async def get_feed(
         self, feed: Feed = None
@@ -428,6 +433,13 @@ class Controller(commands.Cog):
 
             self.feeds.append(user)
 
+            # wait 60 seconds after every 90 activity to prevent rate limiting
+            if i % 90 == 0 and i >= 90:
+                logger.info(f"Waiting 60 seconds.")
+                await asyncio.sleep(60)
+
+        logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
+
         for i, user in enumerate(self.feeds):
             user: Activity
 
@@ -442,8 +454,8 @@ class Controller(commands.Cog):
                 activity=user,
             )
 
-            # wait 60 seconds after every 30 feeds to prevent rate limiting
-            if i % 30 == 0 and i >= 30:
+            # wait 60 seconds after every 45 feeds to prevent rate limiting
+            if i % 45 == 0 and i >= 45:
                 logger.info(f"Waiting 60 seconds.")
                 await asyncio.sleep(60)
 
@@ -477,7 +489,7 @@ class Controller(commands.Cog):
                 )
 
                 # wait 60 seconds after every 30 feeds to prevent rate limiting
-                if i % 30 == 0 and i >= 30:
+                if i % 45 == 0 and i >= 45:
                     logger.info(f"Waiting 60 seconds.")
                     await asyncio.sleep(60)
 
