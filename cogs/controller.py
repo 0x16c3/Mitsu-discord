@@ -366,7 +366,7 @@ class Controller(commands.Cog):
 
         error_channel_ids = []
 
-        for i, item in enumerate(items):
+        for item in items:
             channel: discord.TextChannel = self.client.get_channel(int(item["channel"]))
 
             if item in self.feeds:
@@ -428,11 +428,7 @@ class Controller(commands.Cog):
 
             self.feeds.append(user)
 
-            # wait 60 seconds after every 40 feed to prevent rate limiting
-            if i % 40 == 0:
-                await asyncio.sleep(30)
-
-        for user in self.feeds:
+        for i, user in enumerate(self.feeds):
             user: Activity
 
             enable_filter = not user.channel.is_nsfw()
@@ -445,6 +441,11 @@ class Controller(commands.Cog):
                 filter_adult=enable_filter,
                 activity=user,
             )
+
+            # wait 60 seconds after every 30 feeds to prevent rate limiting
+            if i % 30 == 0:
+                logger.info(f"Waiting 60 seconds.")
+                await asyncio.sleep(30)
 
         logger.info(f"Loaded {len(self.feeds)}.")
         self.loaded = True
