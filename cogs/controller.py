@@ -81,6 +81,7 @@ class Feed:
         self.entries = []
         self.entries_processed = []
         self._init = False
+        self.reset = False
 
     async def retrieve(
         self,
@@ -91,7 +92,7 @@ class Feed:
         """Retrieves activity feed from AniList.
 
         Returns:
-            List[Union[CListActivity, CTextActivity]],: First 15 activities.
+            List[Union[CListActivity, CTextActivity]],: First int(config["MEMORY_LIMIT"]) activities.
             List[Union[CListActivity, CTextActivity]]]: Entire activity list.
         """
         try:
@@ -125,17 +126,17 @@ class Feed:
             self.errors += 1
             return [], []
 
-        return res[:15], res
+        return res[: int(config["MEMORY_LIMIT"])], res
 
-    async def update(self, feed: list) -> None:
+    async def update(self, feed: List[Union[CListActivity, CTextActivity]]) -> None:
         """Updates activity list.
         Checks for new activities.
 
         Args:
-            feed (list): Latest activity feed from AniList
+            feed (List[Union[CListActivity, CTextActivity]]): Latest activity feed from AniList
         """
 
-        if not self._init:
+        if not self._init or self.reset:
             if not len(feed):
                 logger.debug("Empty feed " + str(self))
                 return
@@ -143,13 +144,15 @@ class Feed:
             for item in feed:
                 self.entries_processed.append(item)
 
-            self._init = True
+            if not self.reset:
+                logger.info("Initialized " + str(self))
+                logger.debug(
+                    "\n  List:\n   "
+                    + "\n   ".join(str(x.id) for x in self.entries_processed)
+                )
 
-            logger.info("Initialized " + str(self))
-            logger.debug(
-                "\n  List:\n   "
-                + "\n   ".join(str(x.id) for x in self.entries_processed)
-            )
+            self._init = True
+            self.reset = False
             return
 
         for item in feed:
@@ -158,8 +161,21 @@ class Feed:
             if self.type == CListActivity:
                 if item.media.id in (i.media.id for i in self.entries):
                     continue
+                if item.media.id in (i.media.id for i in self.entries_processed):
+                    # check date
+                    first_occurence: CListActivity = next(
+                        i for i in self.entries_processed if i.media.id == item.media.id
+                    )
+
+                    if item.date.timestamp < first_occurence.date.timestamp:
+                        continue
+
+                if item.date.timestamp < self.entries_processed[-1].date.timestamp:
+                    continue
 
             self.entries.insert(0, item)
+            self.entries = self.entries[: int(config["MEMORY_LIMIT"])]
+
             logger.info("Added " + str(item.id))
 
     async def move_item(self, item, func=None, **kwargs) -> bool:
@@ -202,8 +218,16 @@ class Feed:
                 self.entries_processed.insert(0, item)
             elif self.type == CTextActivity:
                 self.entries_processed.insert(0, item)
+            else:
+                logger.info("Unknown type " + str(self.type))
 
             self.entries.remove(item)
+            if item_old in self.entries:
+                self.entries.remove(item_old)
+
+            self.entries_processed = self.entries_processed[
+                : int(config["MEMORY_LIMIT"])
+            ]
 
             processed = True
 
@@ -230,10 +254,11 @@ class Feed:
             if moved:
                 processed = True
 
+        """
         if processed and len(self.entries_processed) > int(config["MEMORY_LIMIT"]):
             self.entries_processed = []
             self.entries = []
-            self._init = False
+            self.reset = True
 
             items, items_full = await self.retrieve()
             if len(items) == 0:
@@ -244,6 +269,7 @@ class Feed:
 
             logger.info("Reset " + str(self) + " - exceeded entry limit.")
             return
+        """
 
         return
 
@@ -363,6 +389,10 @@ class Controller(commands.Cog):
     async def on_ready(self):
         """Loads saved feeds from the database."""
 
+        channels = await database.channel_get()
+        for ch in channels:
+            await database.channel_repair(ch["channel"])
+
         items = await database.feed_get()
 
         logger.info(
@@ -435,11 +465,12 @@ class Controller(commands.Cog):
 
             # wait 60 seconds after every 90 activity to prevent rate limiting
             if i % 90 == 0 and i >= 90:
-                logger.info(f"Waiting 60 seconds.")
+                logger.debug(f"Waiting 60 seconds.")
                 await asyncio.sleep(60)
 
-        logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
-        await asyncio.sleep(60)
+        if len(self.feeds) > 30:
+            logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
+            await asyncio.sleep(60)
 
         for i, user in enumerate(self.feeds):
             user: Activity
@@ -457,7 +488,7 @@ class Controller(commands.Cog):
 
             # wait 60 seconds after every 45 feeds to prevent rate limiting
             if i % 45 == 0 and i >= 45:
-                logger.info(f"Waiting 60 seconds.")
+                logger.debug(f"Waiting 60 seconds.")
                 await asyncio.sleep(60)
 
         logger.info(f"Loaded {len(self.feeds)}.")
@@ -491,7 +522,7 @@ class Controller(commands.Cog):
 
                 # wait 60 seconds after every 30 feeds to prevent rate limiting
                 if i % 45 == 0 and i >= 45:
-                    logger.info(f"Waiting 60 seconds.")
+                    logger.debug(f"Waiting 60 seconds.")
                     await asyncio.sleep(60)
 
     @cog_ext.cog_slash(
@@ -1000,6 +1031,7 @@ class Controller(commands.Cog):
             current = {
                 "channel": ctx.channel.id,
                 "list_block_progress": False,
+                "list_block_completion": False,
                 "list_block_planning": False,
                 "list_block_dropped": False,
                 "list_block_paused": False,
@@ -1013,9 +1045,9 @@ class Controller(commands.Cog):
                     value=i,
                     default=not current[f"list_block_{i}"],
                 )
-                for i in ["progress", "planning", "dropped", "paused"]
+                for i in ["progress", "completion", "planning", "dropped", "paused"]
             ],
-            max_values=4,
+            max_values=5,
             placeholder="Filter enabled list activities for this channel.",
         )
         actionrow = create_actionrow(select)
@@ -1064,9 +1096,15 @@ class Controller(commands.Cog):
                             value=i,
                             default=not current[f"list_block_{i}"],
                         )
-                        for i in ["progress", "planning", "dropped", "paused"]
+                        for i in [
+                            "progress",
+                            "completion",
+                            "planning",
+                            "dropped",
+                            "paused",
+                        ]
                     ],
-                    max_values=4,
+                    max_values=5,
                     placeholder="Filter enabled list activities for this channel.",
                 )
                 actionrow = create_actionrow(select)
@@ -1083,9 +1121,15 @@ class Controller(commands.Cog):
                             value=i,
                             default=not current[f"list_block_{i}"],
                         )
-                        for i in ["progress", "planning", "dropped", "paused"]
+                        for i in [
+                            "progress",
+                            "completion",
+                            "planning",
+                            "dropped",
+                            "paused",
+                        ]
                     ],
-                    max_values=4,
+                    max_values=5,
                     placeholder="Filter enabled list activities for this channel.",
                     disabled=True,
                 )

@@ -49,7 +49,7 @@ class Database:
         loop = asyncio.get_event_loop()
 
         for item in items:
-            for status in ["progress", "planning", "dropped", "paused"]:
+            for status in ["progress", "completion", "planning", "dropped", "paused"]:
                 if not f"list_block_{status}" in item:
                     item[f"list_block_{status}"] = False
 
@@ -58,7 +58,7 @@ class Database:
     async def channel_update(self, id, item: Any) -> None:
         loop = asyncio.get_event_loop()
 
-        for status in ["progress", "planning", "dropped", "paused"]:
+        for status in ["progress", "completion", "planning", "dropped", "paused"]:
             if not f"list_block_{status}" in item:
                 item[f"list_block_{status}"] = False
 
@@ -74,10 +74,30 @@ class Database:
 
         return True
 
+    async def channel_repair(self, id) -> None:
+        loop = asyncio.get_event_loop()
+        channel = self.channels.get(where("channel") == int(id))
+
+        for status in ["progress", "completion", "planning", "dropped", "paused"]:
+            if not f"list_block_{status}" in channel:
+                channel[f"list_block_{status}"] = False
+
+        try:
+            await loop.run_in_executor(
+                None,
+                self.channels.update,
+                channel,
+                where("channel") == id,
+            )
+        except:
+            return False
+
+        return True
+
     async def _channel_remove(self, item: Any) -> bool:
         loop = asyncio.get_event_loop()
 
-        for status in ["progress", "planning", "dropped", "paused"]:
+        for status in ["progress", "completion", "planning", "dropped", "paused"]:
             if not f"list_block_{status}" in item:
                 item[f"list_block_{status}"] = False
 

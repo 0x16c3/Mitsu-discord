@@ -371,7 +371,7 @@ class CListActivity(ListActivity):
         channel: discord.TextChannel = None,
         filter_adult: bool = True,
         activity=None,
-    ) -> Optional[discord.Embed]:
+    ) -> Optional[Union[discord.Embed, Tuple[str, list, discord.Embed]]]:
 
         item_idx = -1
         if activity:
@@ -391,16 +391,14 @@ class CListActivity(ListActivity):
                 ch = matching[0]
 
                 # progress
-                if (
-                    listitem.status
-                    in [
-                        "CURRENT",
-                        "REPEATING",
-                        "COMPLETED",
-                    ]
-                    or item.status in ["REWATCHED", "REREAD"]
-                ):
+                if listitem.status in [
+                    "CURRENT",
+                    "REPEATING",
+                ] or item.status in ["REWATCHED", "REREAD"]:
                     if ch["list_block_progress"]:
+                        return None
+                elif listitem.status in ["COMPLETED"]:
+                    if ch["list_block_completion"]:
                         return None
                 elif listitem.status == "PAUSED":
                     if ch["list_block_paused"]:
@@ -585,7 +583,7 @@ class CListActivity(ListActivity):
                                 try:
                                     await feed.sent_message.delete()
                                 except Exception as e:
-                                    logger.info(
+                                    logger.debug(
                                         f"Cannot remove message -> {str(channel.id)} : {item.username}\n{e}"
                                     )
 
