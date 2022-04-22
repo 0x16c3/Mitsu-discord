@@ -49,7 +49,14 @@ class Database:
         loop = asyncio.get_event_loop()
 
         for item in items:
-            for status in ["progress", "completion", "planning", "dropped", "paused"]:
+            for status in [
+                "progress",
+                "started",
+                "completion",
+                "planning",
+                "dropped",
+                "paused",
+            ]:
                 if not f"list_block_{status}" in item:
                     item[f"list_block_{status}"] = False
 
@@ -58,7 +65,14 @@ class Database:
     async def channel_update(self, id, item: Any) -> None:
         loop = asyncio.get_event_loop()
 
-        for status in ["progress", "completion", "planning", "dropped", "paused"]:
+        for status in [
+            "progress",
+            "started",
+            "completion",
+            "planning",
+            "dropped",
+            "paused",
+        ]:
             if not f"list_block_{status}" in item:
                 item[f"list_block_{status}"] = False
 
@@ -78,7 +92,14 @@ class Database:
         loop = asyncio.get_event_loop()
         channel = self.channels.get(where("channel") == int(id))
 
-        for status in ["progress", "completion", "planning", "dropped", "paused"]:
+        for status in [
+            "progress",
+            "started",
+            "completion",
+            "planning",
+            "dropped",
+            "paused",
+        ]:
             if not f"list_block_{status}" in channel:
                 channel[f"list_block_{status}"] = False
 
@@ -97,7 +118,14 @@ class Database:
     async def _channel_remove(self, item: Any) -> bool:
         loop = asyncio.get_event_loop()
 
-        for status in ["progress", "completion", "planning", "dropped", "paused"]:
+        for status in [
+            "progress",
+            "started",
+            "completion",
+            "planning",
+            "dropped",
+            "paused",
+        ]:
             if not f"list_block_{status}" in item:
                 item[f"list_block_{status}"] = False
 
@@ -108,6 +136,8 @@ class Database:
                 (
                     (where("channel") == item["channel"])
                     & (where("list_block_progress") == item["list_block_progress"])
+                    & (where("list_block_started") == item["list_block_started"])
+                    & (where("list_block_completion") == item["list_block_completion"])
                     & (where("list_block_planning") == item["list_block_planning"])
                     & (where("list_block_dropped") == item["list_block_dropped"])
                     & (where("list_block_paused") == item["list_block_paused"])

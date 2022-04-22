@@ -1031,6 +1031,7 @@ class Controller(commands.Cog):
             current = {
                 "channel": ctx.channel.id,
                 "list_block_progress": False,
+                "list_block_started": False,
                 "list_block_completion": False,
                 "list_block_planning": False,
                 "list_block_dropped": False,
@@ -1045,9 +1046,16 @@ class Controller(commands.Cog):
                     value=i,
                     default=not current[f"list_block_{i}"],
                 )
-                for i in ["progress", "completion", "planning", "dropped", "paused"]
+                for i in [
+                    "progress",
+                    "started",
+                    "completion",
+                    "planning",
+                    "dropped",
+                    "paused",
+                ]
             ],
-            max_values=5,
+            max_values=6,
             placeholder="Filter enabled list activities for this channel.",
         )
         actionrow = create_actionrow(select)
@@ -1071,7 +1079,7 @@ class Controller(commands.Cog):
                 selected: List[str] = [i for i in button_ctx.selected_options]
                 await button_ctx.defer(edit_origin=True)
 
-                for i in ["progress", "planning", "dropped", "paused"]:
+                for i in ["progress", "started", "planning", "dropped", "paused"]:
                     if i in selected and current[f"list_block_{i}"]:
                         current[f"list_block_{i}"] = False
                     elif i not in selected and not current[f"list_block_{i}"]:
@@ -1098,13 +1106,14 @@ class Controller(commands.Cog):
                         )
                         for i in [
                             "progress",
+                            "started",
                             "completion",
                             "planning",
                             "dropped",
                             "paused",
                         ]
                     ],
-                    max_values=5,
+                    max_values=6,
                     placeholder="Filter enabled list activities for this channel.",
                 )
                 actionrow = create_actionrow(select)
@@ -1123,13 +1132,14 @@ class Controller(commands.Cog):
                         )
                         for i in [
                             "progress",
+                            "started",
                             "completion",
                             "planning",
                             "dropped",
                             "paused",
                         ]
                     ],
-                    max_values=5,
+                    max_values=6,
                     placeholder="Filter enabled list activities for this channel.",
                     disabled=True,
                 )

@@ -395,7 +395,9 @@ class CListActivity(ListActivity):
                     "CURRENT",
                     "REPEATING",
                 ] or item.status in ["REWATCHED", "REREAD"]:
-                    if ch["list_block_progress"]:
+                    if listitem.progress <= 1 and ch["list_block_started"]:
+                        return None
+                    elif ch["list_block_progress"]:
                         return None
                 elif listitem.status in ["COMPLETED"]:
                     if ch["list_block_completion"]:
