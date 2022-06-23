@@ -3,7 +3,9 @@ __pycache__
 .editorconfig
 config.ini
 
+venv
 tmp
+logs
 
 cogs/_guild.json
 cogs/_user.json

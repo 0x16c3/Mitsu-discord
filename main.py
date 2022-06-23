@@ -3,13 +3,19 @@ import discord
 from discord.ext import commands
 from discord_slash import SlashCommand
 
+import os, sys
+import argparse
+
+os.environ["LOG_LEVEL"] = "WARNING"
+
 from cogs.client import client
 from cogs.controller import Controller
 from cogs.utils import *
 from cogs.api.database import database
 
-import os
-import argparse
+from loguru import logger
+
+
 
 # create `/tmp`
 if not os.path.exists("tmp"):
@@ -114,8 +120,25 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    logger._debug = args.debug
-    logger._info = args.info
+
+    os.environ["LOG_LEVEL"] = "WARNING"
+
+    if args.info:
+        os.environ["LOG_LEVEL"] = "INFO"
+    elif args.debug:
+        os.environ["LOG_LEVEL"] = "DEBUG"
+
+    fmt = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green>"
+        " | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>"
+        " | "
+        "<level>{level: <8}</level>: <level>{message}</level>"
+    )
+
+    logger.remove()
+    logger.add(sys.stderr, format=fmt, level=os.environ["LOG_LEVEL"])
+    logger.add("logs/log_{time}.log", enqueue=True, rotation="12:00")
 
     for extension in cogs:
         if args.debug and extension == "cogs.error":

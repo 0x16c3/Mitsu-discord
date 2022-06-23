@@ -4,34 +4,10 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 import configparser
+from loguru import logger
 
 # anilist
 import anilist
-
-"""
-    LOGGING
-"""
-
-
-class Log:
-    def __init__(self, debug: bool = False, info: bool = False) -> None:
-        self._debug = debug
-        self._info = info
-
-    def debug(self, msg):
-        if self._debug:
-            print("DEBUG: " + msg)
-
-    def info(self, msg):
-        if self._info or self._debug:
-            print("INFO: " + msg)
-
-    def print(self, msg):
-        print("LOG: " + msg)
-
-
-logger = Log()
-""""""
 
 
 """
@@ -231,7 +207,7 @@ if not os.path.isfile("tmp/config.ini"):
 cfgparser.read("tmp/config.ini", encoding="utf-8-sig")
 config = cfgparser["DEFAULT"]
 
-logger.print(
+logger.info(
     f"LOADED CONFIG:\n"
     f'  INTERVAL = {config["INTERVAL"]}\n'
     f'  MEMORY_LIMIT = {config["MEMORY_LIMIT"]}\n'
@@ -243,7 +219,7 @@ def get_debug_guild_id() -> Optional[List[int]]:
     if not config["SLASH_TEST_GUILD"].isdecimal():
         return None
 
-    if not logger._debug:
+    if os.environ["LOG_LEVEL"] != "DEBUG":
         return None
 
     if int(config["SLASH_TEST_GUILD"]) == -1:

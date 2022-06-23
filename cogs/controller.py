@@ -19,6 +19,7 @@ from .utils import *
 from .api.database import database
 from .api.types import CCharacter, CUser, CAnime, CManga, CListActivity, CTextActivity
 from typing import Union
+from loguru import logger
 import sys
 
 
@@ -44,11 +45,11 @@ class Feed:
     def get_type(i: any):
         return list(Feed.TYPE.keys())[list(Feed.TYPE.values()).index(i)]
 
-    def __init__(self, username: str, userid: int, feed: int) -> None:
+    def __init__(self, username: str, userid: int, type: int) -> None:
         self.username = username
         self.userid = userid
 
-        self.feed = feed
+        self.feed = type
 
         self.function = None
         self.arguments = None
@@ -118,7 +119,7 @@ class Feed:
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            logger.print(
+            logger.error(
                 "Error on {}: {}\n[STACK] {} {} {}".format(
                     self.username, e, exc_type, fname, exc_tb.tb_lineno
                 )
@@ -158,11 +159,12 @@ class Feed:
         for item in feed:
             if item.id in (i.id for i in self.entries_processed):
                 continue
+
             if self.type == CListActivity:
                 if item.media.id in (i.media.id for i in self.entries):
                     continue
+
                 if item.media.id in (i.media.id for i in self.entries_processed):
-                    # check date
                     first_occurence: CListActivity = next(
                         i for i in self.entries_processed if i.media.id == item.media.id
                     )
@@ -208,7 +210,7 @@ class Feed:
 
                     exc_type, exc_obj, exc_tb = sys.exc_info()
                     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                    logger.print(
+                    logger.error(
                         "Error running function on entry {}: {}\n[STACK] {} {} {}".format(
                             item.id, e, exc_type, fname, exc_tb.tb_lineno
                         )
@@ -272,6 +274,12 @@ class Feed:
         """
 
         return
+
+    def __repr__(self):
+        return "<Feed: {}:{}>".format(self.username, str(self.feed))
+
+    def __eq__(self, o: "Feed"):
+        return "<Feed: {}:{}>".format(self.username, str(self.feed)) == str(o)
 
 
 class Activity:
@@ -402,10 +410,10 @@ class Controller(commands.Cog):
         error_channel_ids = []
 
         for i, item in enumerate(items):
-            channel: discord.TextChannel = self.client.get_channel(int(item["channel"]))
-
             if item in self.feeds:
                 continue
+
+            channel: discord.TextChannel = self.client.get_channel(int(item["channel"]))
 
             if not channel:
                 logger.debug(
@@ -506,18 +514,23 @@ class Controller(commands.Cog):
 
             await asyncio.sleep(int(config["INTERVAL"]))
 
-            for i, user in enumerate(self.feeds):
-                user: Activity
+            no_dupes = []
+            [no_dupes.append(x) for x in self.feeds if x not in no_dupes]
 
-                enable_filter = not user.channel.is_nsfw()
+            self.feeds = no_dupes
 
-                await user.get_feed(user.feed)
-                await user.feed.process_entries(
-                    user.feed.type.send_embed,
-                    channel=user.channel,
+            for i, activity in enumerate(self.feeds):
+                activity: Activity
+
+                enable_filter = not activity.channel.is_nsfw()
+
+                await activity.get_feed(activity.feed)
+                await activity.feed.process_entries(
+                    activity.feed.type.send_embed,
+                    channel=activity.channel,
                     anilist=anilist,
                     filter_adult=enable_filter,
-                    activity=user,
+                    activity=activity,
                 )
 
                 # wait 60 seconds after every 30 feeds to prevent rate limiting
@@ -1245,7 +1258,7 @@ class Controller(commands.Cog):
             return
 
         embed = await profile.send_embed()
-        await ctx.send("Done!", embed=embed, hidden=send_message)
+        await ctx.send("", embed=embed, hidden=send_message)
 
     @cog_ext.cog_slash(
         name="search",
@@ -1411,7 +1424,7 @@ class Controller(commands.Cog):
                 )
                 actionrow = create_actionrow(select)
                 await message.edit(
-                    content="Done!",
+                    content=None,
                     components=[actionrow],
                 )
                 break
