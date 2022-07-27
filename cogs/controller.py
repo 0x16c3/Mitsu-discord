@@ -84,6 +84,7 @@ class Feed:
         self._init = False
         self.reset = False
 
+    @logger.catch
     async def retrieve(
         self,
     ) -> Dict[
