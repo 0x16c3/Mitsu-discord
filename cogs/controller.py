@@ -105,14 +105,14 @@ class Feed:
 
             if self.feed == self.TYPE["TEXT"]:
                 msg = await anilist.get_activity(
-                    id=self.username, content_type="message"
+                    id=self.userid, content_type="message"
                 )
                 if msg:
                     ret.extend(msg)
 
             res = []
             for item in ret:
-                obj = self.type.create(item, self.username)
+                obj = self.type.create(item, self.username, self.userid)
                 res.append(obj)
 
             self.errors = 0
@@ -288,12 +288,14 @@ class Activity:
 
     Args:
         username (str): Username of the profile
+        userid (int): Userid of the profile
         channel (discord.TextChannel): Discord channel that the updates are processed in
         profile (CUser): Cached user profile for extra information
         t (Union[str, int]): Feed type. Defaults to "ANIME".
 
     Attributes:
         username (str): Username of the profile
+        userid (int): Userid of the profile
         channel (discord.TextChannel): Discord channel that the updates are processed in
         profile (CUser): Cached user profile for extra information
         type (Feed.TYPE): Feed type
@@ -477,9 +479,8 @@ class Controller(commands.Cog):
                 logger.debug(f"Waiting 60 seconds.")
                 await asyncio.sleep(60)
 
-        if len(self.feeds) > 30:
-            logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
-            await asyncio.sleep(60)
+        logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
+        await asyncio.sleep(60)
 
         for i, user in enumerate(self.feeds):
             user: Activity
@@ -493,10 +494,11 @@ class Controller(commands.Cog):
                 anilist=anilist,
                 filter_adult=enable_filter,
                 activity=user,
+                user=user.profile,
             )
 
-            # wait 60 seconds after every 45 feeds to prevent rate limiting
-            if i % 45 == 0 and i >= 45:
+            # wait 60 seconds after every 30 feeds to prevent rate limiting
+            if i % 30 == 0 and i >= 30:
                 logger.debug(f"Waiting 60 seconds.")
                 await asyncio.sleep(60)
 
@@ -534,8 +536,8 @@ class Controller(commands.Cog):
                     activity=activity,
                 )
 
-                # wait 60 seconds after every 30 feeds to prevent rate limiting
-                if i % 45 == 0 and i >= 45:
+                # wait 60 seconds after every 25 feeds to prevent rate limiting
+                if i % 25 == 0 and i >= 25:
                     logger.debug(f"Waiting 60 seconds.")
                     await asyncio.sleep(60)
 
@@ -1310,14 +1312,14 @@ class Controller(commands.Cog):
                         (
                             (
                                 i.title.english
-                                if len(i.title.english) <= 50
-                                else i.title.english[:47] + "..."
+                                if len(i.title.english) <= 25
+                                else i.title.english[:22] + "..."
                             )
                             if hasattr(i.title, "english")
                             else (
                                 i.title.native
-                                if len(i.title.native) <= 50
-                                else i.title.native[:47] + "..."
+                                if len(i.title.native) <= 25
+                                else i.title.native[:22] + "..."
                             )
                         )
                         if media != "character"
@@ -1380,14 +1382,14 @@ class Controller(commands.Cog):
                                 (
                                     (
                                         i.title.english
-                                        if len(i.title.english) <= 50
-                                        else i.title.english[:47] + "..."
+                                        if len(i.title.english) <= 25
+                                        else i.title.english[:22] + "..."
                                     )
                                     if hasattr(i.title, "english")
                                     else (
                                         i.title.native
-                                        if len(i.title.native) <= 50
-                                        else i.title.native[:47] + "..."
+                                        if len(i.title.native) <= 25
+                                        else i.title.native[:22] + "..."
                                     )
                                 )
                                 if media != "character"

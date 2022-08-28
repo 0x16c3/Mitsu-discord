@@ -322,14 +322,18 @@ class CUser(User):
 class CListActivity(ListActivity):
 
     username = None
+    userid = None
     sent_message = None
 
     @staticmethod
-    def create(obj: ListActivity, username: str = None) -> "CListActivity":
+    def create(obj: ListActivity, username: str = None, userid: int = None) -> "CListActivity":
         obj.__class__ = CListActivity
 
         if username:
             obj.username = username
+
+        if userid:
+            obj.userid = userid
 
         obj.sent_message = None
 
@@ -352,17 +356,13 @@ class CListActivity(ListActivity):
 
         return colors[0]
 
-    async def get_list(self, anilist: AsyncClient) -> Dict[User, MediaList]:
+    async def get_list(self, anilist: AsyncClient) -> MediaList:
 
         if not self.username:
-            return None, None
-
-        user = await anilist.get_user(self.username)
-        if not user:
-            return None, None
+            return None
 
         listitem = await anilist.get_list_item(self.username, self.media.id)
-        return user, listitem
+        return listitem
 
     @staticmethod
     async def send_embed(
@@ -370,6 +370,7 @@ class CListActivity(ListActivity):
         anilist: AsyncClient,
         channel: discord.TextChannel = None,
         filter_adult: bool = True,
+        user: CUser = None,
         activity=None,
     ) -> Optional[Union[discord.Embed, Tuple[str, list, discord.Embed]]]:
 
@@ -377,8 +378,14 @@ class CListActivity(ListActivity):
         if activity:
             item_idx = activity.feed.entries.index(item)
 
-        user, listitem = await item.get_list(anilist)
-        if not user or not listitem:
+        if not user:
+            user = await anilist.get_user(item.user.name)
+
+        if not user:
+            return None
+
+        listitem = await item.get_list(anilist)
+        if not listitem:
             return None
 
         user = CUser.create(user)
@@ -611,11 +618,17 @@ class CListActivity(ListActivity):
 class CTextActivity(TextActivity):
 
     username = None
+    userid = None
 
     @staticmethod
-    def create(obj: TextActivity, username) -> "CTextActivity":
+    def create(obj: TextActivity, username: str = None, userid: int = None) -> "CTextActivity":
         obj.__class__ = CTextActivity
-        obj.username = username
+
+        if username:
+            obj.username = username
+
+        if userid:
+            obj.userid = userid
 
         return obj
 
@@ -624,6 +637,7 @@ class CTextActivity(TextActivity):
         item: "CTextActivity",
         anilist: AsyncClient,
         channel: discord.TextChannel = None,
+        user: CUser = None,
         **kwargs,
     ) -> Optional[discord.Embed]:
 
