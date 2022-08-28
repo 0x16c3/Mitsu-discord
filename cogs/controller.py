@@ -479,8 +479,9 @@ class Controller(commands.Cog):
                 logger.debug(f"Waiting 60 seconds.")
                 await asyncio.sleep(60)
 
-        logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
-        await asyncio.sleep(60)
+        if len(items) > 90:
+            logger.info(f"Created Activity objects, waiting 60 seconds to fetch feeds.")
+            await asyncio.sleep(60)
 
         for i, user in enumerate(self.feeds):
             user: Activity
@@ -534,6 +535,7 @@ class Controller(commands.Cog):
                     anilist=anilist,
                     filter_adult=enable_filter,
                     activity=activity,
+                    user=activity.profile,
                 )
 
                 # wait 60 seconds after every 25 feeds to prevent rate limiting
