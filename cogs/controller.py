@@ -516,8 +516,6 @@ class Controller(commands.Cog):
                 await asyncio.sleep(5)
                 continue
 
-            await asyncio.sleep(int(config["INTERVAL"]))
-
             no_dupes = []
             [no_dupes.append(x) for x in self.feeds if x not in no_dupes]
 
@@ -539,7 +537,7 @@ class Controller(commands.Cog):
                 )
 
                 # wait 60 seconds after every 25 feeds to prevent rate limiting
-                if i % 25 == 0 and i >= 25:
+                if i % 28 == 0 and i >= 28:
                     logger.debug(f"Waiting 60 seconds.")
                     await asyncio.sleep(60)
 
