@@ -57,13 +57,7 @@ class Feed:
 
         self.errors = 0
 
-        if self.feed == self.TYPE["ANIME"]:
-            self.type = CListActivity
-            self.function = anilist.get_activity
-            self.arguments = {
-                "id": self.userid,
-                "content_type": "anime",
-            }
+       
         if self.feed == self.TYPE["MANGA"]:
             self.type = CListActivity
             self.function = anilist.get_activity
@@ -71,13 +65,21 @@ class Feed:
                 "id": self.userid,
                 "content_type": "manga",
             }
-        if self.feed == self.TYPE["TEXT"]:
+        elif self.feed == self.TYPE["TEXT"]:
             self.type = CTextActivity
             self.function = anilist.get_activity
             self.arguments = {
                 "id": self.userid,
                 "content_type": "text",
             }
+        else: # if self.feed == self.TYPE["ANIME"]
+            self.type = CListActivity
+            self.function = anilist.get_activity
+            self.arguments = {
+                "id": self.userid,
+                "content_type": "anime",
+            }
+        
 
         self.entries = []
         self.entries_processed = []
@@ -97,36 +99,43 @@ class Feed:
             List[Union[CListActivity, CTextActivity]],: First int(config["MEMORY_LIMIT"]) activities.
             List[Union[CListActivity, CTextActivity]]]: Entire activity list.
         """
-        try:
-            ret = await self.function(**self.arguments)
 
-            if not isinstance(ret, list):
-                ret = []
+        while True:
+            try:
+                # check if self.arguments is None
+                if not self.arguments:
+                    logger.error("Arguments for feed are None")
+                    return [], []
 
-            if self.feed == self.TYPE["TEXT"]:
-                msg = await anilist.get_activity(
-                    id=self.userid, content_type="message"
-                )
-                if msg:
-                    ret.extend(msg)
+                ret = await self.function(**self.arguments)
 
-            res = []
-            for item in ret:
-                obj = self.type.create(item, self.username, self.userid)
-                res.append(obj)
+                if not isinstance(ret, list):
+                    ret = []
 
-            self.errors = 0
+                if self.feed == self.TYPE["TEXT"]:
+                    msg = await anilist.get_activity(
+                        id=self.userid, content_type="message"
+                    )
+                    if msg:
+                        ret.extend(msg)
 
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            logger.error(
-                "Error on {}: {}\n[STACK] {} {} {}".format(
-                    self.username, e, exc_type, fname, exc_tb.tb_lineno
-                )
-            )
-            self.errors += 1
-            return [], []
+                res = []
+                for item in ret:
+                    obj = self.type.create(item, self.username, self.userid)
+                    res.append(obj)
+
+                self.errors = 0
+                break
+
+            except Exception as e:
+                logger.trace(f"Error on {self.username}")
+                
+                self.errors += 1
+                if self.errors > 3:
+                    logger.error("Too many errors on " + self.username)
+                    return [], []
+
+                await asyncio.sleep(5)
 
         return res[: int(config["MEMORY_LIMIT"])], res
 
