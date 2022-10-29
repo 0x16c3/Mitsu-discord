@@ -507,10 +507,13 @@ class Controller(commands.Cog):
                 user=user.profile,
             )
 
-            # wait 60 seconds after every 30 feeds to prevent rate limiting
-            if i % 30 == 0 and i >= 30:
-                logger.debug(f"Waiting 60 seconds.")
-                await asyncio.sleep(60)
+            if len(self.feeds) > 27:
+                # wait 60 seconds after every 25 feeds to prevent rate limiting
+                if i % 28 == 0 and i >= 28:
+                    logger.debug(f"Waiting 60 seconds.")
+                    await asyncio.sleep(60)
+            else:
+                await asyncio.sleep(1)
 
         logger.info(f"Loaded {len(self.feeds)}.")
         self.loaded = True
@@ -545,10 +548,13 @@ class Controller(commands.Cog):
                     user=activity.profile,
                 )
 
-                # wait 60 seconds after every 25 feeds to prevent rate limiting
-                if i % 28 == 0 and i >= 28:
-                    logger.debug(f"Waiting 60 seconds.")
-                    await asyncio.sleep(60)
+                if len(self.feeds) > 27:
+                    # wait 60 seconds after every 25 feeds to prevent rate limiting
+                    if i % 28 == 0 and i >= 28:
+                        logger.debug(f"Waiting 60 seconds.")
+                        await asyncio.sleep(60)
+                else:
+                    await asyncio.sleep(1)
 
     @cog_ext.cog_slash(
         name="activity",
